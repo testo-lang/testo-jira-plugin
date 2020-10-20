@@ -1,0 +1,63 @@
+
+network internet {
+	mode: "nat"
+}
+
+machine jira_plugin_builder {
+	cpus: 4
+	ram: 8Gb
+	iso: "${ISO_DIR}/ubuntu-20.04.1-desktop-amd64.iso"
+	disk main: {
+		size: 20Gb
+	}
+
+	nic nat: {
+		attached_to: "internet"
+	}
+}
+
+param login "testo"
+param password "1111"
+
+test install_ubuntu_desktop {
+	jira_plugin_builder {
+		start
+		if (check "Language" timeout 10s) {
+			wait "Language"; press Enter
+			wait "Try Ubuntu without installing"
+			press Down*2, Enter
+			wait "Welcome" timeout 3m
+			mouse click "Continue".from_right(0).center_bottom()
+		} else {
+			wait "Welcome" timeout 3m
+			mouse click "Install Ubuntu".from_right(0).center_bottom()
+		}
+		wait "Keyboard layout"
+		mouse click "Continue".center_bottom()
+		wait "Updates and other software"
+		mouse click "Minimal installation"
+		mouse click "Continue".from_right(0).center_bottom()
+		wait "Installation type"
+		mouse click "Install Now".from_right(0).center_bottom()
+		wait "Write the changes to disks?"
+		mouse click "Continue".from_right(0).center_bottom()
+
+		wait "Where are you?"
+		mouse click "Continue".from_right(0).center_bottom()
+
+		wait "Who are you?"
+		type "${login}"
+		mouse click "Choose a password".right_center().move_right(30)
+		type "${password}"; press Tab; type "${password}"
+		mouse click "Log in automatically"
+		mouse click "Continue".from_right(0).center_bottom()
+
+		wait "Installation Complete" timeout 30m
+		mouse click "Restart Now"
+
+		wait "Please remove the installation medium"; unplug dvd;
+		sleep 3s; press Enter
+
+		wait "Activities" timeout 5m
+	}
+}
