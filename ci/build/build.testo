@@ -18,8 +18,9 @@ machine jira_plugin_builder {
 
 param login "testo"
 param password "1111"
+param hostname "builder"
 
-test install_ubuntu_desktop {
+test jira_builder_install_ubuntu {
 	jira_plugin_builder {
 		start
 		if (check "Language" timeout 10s) {
@@ -46,7 +47,7 @@ test install_ubuntu_desktop {
 		mouse click "Continue".from_right(0).center_bottom()
 
 		wait "Who are you?"
-		type "${login}"
+		type "${login}"; press Tab; press LeftCtrl + A; press Backspace; type "${hostname}"
 		mouse click "Choose a password".right_center().move_right(30)
 		type "${password}"; press Tab; type "${password}"
 		mouse click "Log in automatically"
@@ -59,5 +60,73 @@ test install_ubuntu_desktop {
 		sleep 3s; press Enter
 
 		wait "Activities" timeout 5m
+	}
+}
+
+macro run_app(app) {
+	mouse click "Activities"
+	mouse click "Type to search"; type "${app}";
+	mouse move 0 0
+	wait js "find_text().match('${app}').size() > 1"
+	press Enter
+}
+
+[no_snapshots: true]
+test jira_builder_configure: jira_builder_install_ubuntu {
+	jira_plugin_builder {
+		mouse click "Skip".center_bottom();
+		wait "Livepatch"; mouse click "Next".from_right(0).center_bottom()
+		wait "Help improve Ubuntu"; mouse click "Next".from_right(0).center_bottom()
+		wait "Privacy"; mouse click "Next".from_right(0).center_bottom()
+		wait "Ready to go"; mouse click "Done".from_right(0).center_bottom()
+		#wait "Software Updater"; mouse click "Remind Me Later"; wait !"Software Updater"
+
+		run_app("Settings"); mouse click "Power"
+		mouse click "5 minutes"
+		mouse click "15 minutes"; sleep 500ms
+		mouse click "15 minutes"; mouse click "Never"
+
+		mouse click "Power".from_left(0); press Down
+		mouse move 0 0; mouse click "Displays"
+		mouse click "800 x 600"; mouse click "1920 x 1080"
+		mouse click "Apply".from_right(0)
+		mouse click "Keep Changes"
+		wait !"Keep Changes"
+		press LeftAlt + F4; wait !"Power"
+	}
+}
+
+macro enter_sudo(login="${login}", password="${password}") {
+	type "sudo su"; press Enter
+	wait "[sudo] password"; type "${password}"; press Enter
+	wait "root@${hostname}"
+
+}
+
+test jira_builder_install_ga: jira_builder_configure {
+	jira_plugin_builder {
+		run_app("Terminal")
+		wait "${login}@${hostname}"
+		plug dvd "${ISO_DIR}/testo-guest-additions.iso"
+
+		enter_sudo()
+
+		type "mount /dev/cdrom /media"; press Enter
+		wait "device write-protected"
+		type "dpkg -i /media/testo-guest-additions.deb"; press Enter
+		wait "Processing triggers for systemd"
+		exec bash "echo hello world"
+
+		exec bash "umount /media"
+		unplug dvd
+		sleep 2s
+	}
+}
+
+test jira_builder_prepare: jira_builder_install_ga {
+	jira_plugin_builder {
+		exec bash "apt update"
+		exec bash "apt upgrade -y"
+		abort "stop here"
 	}
 }
