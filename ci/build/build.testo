@@ -261,3 +261,36 @@ test jira_builder_install_tm4j: jira_builder_init_jira_part2 {
 		sleep 5s
 	}
 }
+
+test jira_builder_create_a_test: jira_builder_install_tm4j {
+	jira_plugin_builder {
+		mouse click "Tests".from_top(0)
+		mouse click "Project Settings page"
+		wait "Test Management for Jira is disabled"
+		mouse click "Off".from_right(0).move_left(30); wait "Issue Types"
+		mouse click "Tests".from_top(0)
+		mouse click "Create a test case"
+		wait "Create Test Case"
+
+		mouse click "Name".from_top(0).center_bottom().move_down(20)
+		type "Some test"; press Tab; sleep 200ms; type "Some objective"
+		mouse click "Traceability"
+		wait "Confluence"
+		mouse click "Issues".from_top(1).right_center().move_right(1710)
+		wait "Search Issues"; type "SAMPLE-1"; press Enter
+		mouse click "This is your first task"; mouse click "Add".from_bottom(0)
+		sleep 2s
+	}
+}
+
+test jira_test_testo_plugin: jira_builder_create_a_test {
+	jira_plugin_builder {
+		exec bash "rm -rf /opt/testo_jira_plugin/TestoPlugin/src/*"
+		copyto "${PLUGIN_SRC_DIR}/src/main" "/opt/testo_jira_plugin/TestoPlugin/src/main"
+		exec bash """
+			cd /opt/testo_jira_plugin/TestoPlugin/
+			atlas-mvn package
+		"""
+		abort "stop here"
+	}
+}

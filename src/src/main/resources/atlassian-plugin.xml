@@ -1,24 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
 <atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
-    <plugin-info>
-        <description>${project.description}</description>
-        <version>${project.version}</version>
-        <vendor name="${project.organization.name}" url="${project.organization.url}" />
-        <param name="plugin-icon">images/pluginIcon.png</param>
-        <param name="plugin-logo">images/pluginLogo.png</param>
-    </plugin-info>
-
-    <!-- add our i18n resource -->
-    <resource type="i18n" name="i18n" location="TestoPlugin"/>
-    
-    <!-- add our web resources -->
-    <web-resource key="TestoPlugin-resources" name="TestoPlugin Web Resources">
-        <dependency>com.atlassian.auiplugin:ajs</dependency>
-        
-        <resource type="download" name="TestoPlugin.css" location="/css/TestoPlugin.css"/>
-        <resource type="download" name="TestoPlugin.js" location="/js/TestoPlugin.js"/>
-        <resource type="download" name="images/" location="/images"/>
-
-        <context>TestoPlugin</context>
-    </web-resource>
-    
+  <plugin-info>
+    <description>${project.description}</description>
+    <version>${project.version}</version>
+    <vendor name="${project.organization.name}" url="${project.organization.url}"/>
+    <param name="plugin-icon">images/pluginIcon.png</param>
+    <param name="plugin-logo">images/pluginLogo.png</param>
+  </plugin-info>
+  <!-- add our i18n resource -->
+  <resource type="i18n" name="i18n" location="TestoPlugin"/>
+  <!-- add our web resources -->
+  <web-resource key="TestoPlugin-resources" name="TestoPlugin Web Resources">
+    <dependency>com.atlassian.auiplugin:ajs</dependency>
+    <resource type="download" name="TestoPlugin.css" location="/css/TestoPlugin.css"/>
+    <resource type="download" name="TestoPlugin.js" location="/js/TestoPlugin.js"/>
+    <resource type="download" name="images/" location="/images"/>
+    <context>TestoPlugin</context>
+  </web-resource>
+  <web-item name="TestoNavbarItem" i18n-name-key="testo-navbar-item.name" key="testo-navbar-item" section="system.top.navigation.bar" weight="1000">
+    <description key="testo-navbar-item.description">The TestoNavbarItem Plugin</description>
+    <label key="testo-navbar-item.label"></label>
+    <link linkId="testo-navbar-item-link">deleteMe</link>
+  </web-item>
 </atlassian-plugin>
