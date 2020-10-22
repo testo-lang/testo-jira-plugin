@@ -186,4 +186,78 @@ test jira_builder_init_jira_part1: jira_builder_install_sdk {
 	}
 }
 
+test jira_builder_init_jira_part2: jira_builder_init_jira_part1 {
+	jira_plugin_builder {
+		run_app("Firefox")
+		wait "Welcome to Firefox"
+		mouse click "enter address"; sleep 2s
+		type "http://localhost:2990/jira"; press Enter
+		wait "System Dashboard"
+		type "admin"; press Tab; type "admin"; press Tab; sleep 200ms; press Space
 
+		mouse click "Log In".from_bottom(0)
+		mouse click "Save".from_right(0)
+
+		mouse click "Dismiss".from_left(0)
+		wait "Welcome to Jira, admin!"
+		mouse click "Continue".from_bottom(0)
+
+		wait "avatar"
+		mouse click "Next".from_right(0)
+		wait "Welcome!"
+
+		mouse click "Create sample project"
+		wait "Create project with sample data";
+		mouse click "Next".from_bottom(0)
+		wait "Project management"
+		type "Sample"; press Tab, backspace; type "SAMPLE"
+		mouse move 0 0
+		mouse click "Submit"
+
+		wait "Open issues" timeout 2m; sleep 5s
+	}
+}
+
+test jira_builder_install_tm4j: jira_builder_init_jira_part2 {
+	jira_plugin_builder {
+		press LeftAlt + F10; sleep 1s
+		press LeftAlt + Tab; sleep 1s
+		mouse rclick 500 600
+		mouse click "New Window"
+		wait "${login}@${hostname}"
+
+		copyto "../misc/tm4j.lic" "/opt/tm4j.lic"
+		type "gedit /opt/tm4j.lic"; press Enter
+		wait "Tab Width"
+		press LeftCtrl + A, LeftCtrl + C, LeftAlt + F4 interval 100ms
+		wait !"Tab Width"
+		press LeftAlt + F4
+		press LeftAlt + Tab; sleep 1s
+
+		mouse click "Ok, got it"
+		mouse click "begin expiring in 3".right_center().move_right(40)
+		sleep 1s; mouse click "OK,got it"
+		mouse click "Search".from_top(0).right_center().move_right(200)
+		mouse click "Add-ons"
+		mouse click "Manage add-ons".from_left(0)
+		wait "User-installed add-ons"
+		mouse click "Find new add-ons".from_left(0)
+		wait "Atlassian Marketplace for JIRA"; sleep 10s
+		mouse click "Search the Marketplace"
+		type "TM4J"; press Enter
+		wait "Test Management for Jira"
+		mouse click "Free trial".from_top(0)
+		wait "Accept terms"
+		mouse click "Accept".from_bottom(0)
+		wait "Installing TM4J"
+		wait "You will be redirected" timeout 10m; mouse click "Close".from_right(0); sleep 1s
+		mouse click "Manage".from_right(0)
+		wait "License key"
+		press PAGEDOWN; sleep 1s
+		mouse click "License key".right_center().move_right(50); sleep 500ms
+		press LeftCtrl+V
+		mouse click "Update".from_bottom(0)
+		wait "Your trial is expiring"; press PageUp
+		sleep 5s
+	}
+}
