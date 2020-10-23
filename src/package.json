@@ -1,0 +1,15 @@
+{
+  "name": "testo-tm4j",
+  "version": "1.0.0",
+  "description": "A package for Testo-TM4J interaction",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.20.0",
+    "yargs": "^16.1.0"
+  }
+}

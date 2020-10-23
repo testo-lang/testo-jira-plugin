@@ -178,8 +178,6 @@ test jira_builder_init_jira_part1: jira_builder_install_sdk {
 		sleep 2s
 		type "cd TestoPlugin"; press Enter
 
-		copyto "${PLUGIN_SRC_DIR}/pom.xml" "/opt/testo_jira_plugin/TestoPlugin/pom.xml"
-
 		type "atlas-run"; press Enter
 		wait "JIRA has been upgraded" timeout 2h
 		sleep 10s
@@ -207,7 +205,7 @@ test jira_builder_init_jira_part2: jira_builder_init_jira_part1 {
 		wait "Welcome!"
 
 		mouse click "Create sample project"
-		wait "Create project with sample data";
+		wait "Simple project management";
 		mouse click "Next".from_bottom(0)
 		wait "Project management"
 		type "Sample"; press Tab, backspace; type "SAMPLE"
@@ -237,7 +235,7 @@ test jira_builder_install_tm4j: jira_builder_init_jira_part2 {
 		mouse click "Ok, got it"
 		mouse click "begin expiring in 3".right_center().move_right(40)
 		sleep 1s; mouse click "OK,got it"
-		mouse click "Search".from_top(0).right_center().move_right(200)
+		mouse click "Search".from_top(0).right_center().move_right(220)
 		mouse click "Add-ons"
 		mouse click "Manage add-ons".from_left(0)
 		wait "User-installed add-ons"
@@ -262,7 +260,7 @@ test jira_builder_install_tm4j: jira_builder_init_jira_part2 {
 	}
 }
 
-test jira_builder_create_a_test: jira_builder_install_tm4j {
+test jira_builder_prepare: jira_builder_install_tm4j {
 	jira_plugin_builder {
 		mouse click "Tests".from_top(0)
 		mouse click "Project Settings page"
@@ -278,19 +276,37 @@ test jira_builder_create_a_test: jira_builder_install_tm4j {
 		wait "Confluence"
 		mouse click "Issues".from_top(1).right_center().move_right(1710)
 		wait "Search Issues"; type "SAMPLE-1"; press Enter
-		mouse click "This is your first task"; mouse click "Add".from_bottom(0)
-		sleep 2s
+		mouse click "This is your first task"; mouse click "Add".from_bottom(0); sleep 2s
+		mouse click "Save".from_top(0); sleep 2s
+
+		mouse click "Tests".from_top(1)
+		wait "Cycles"
+		wait "Some test"
+		mouse click "Cycles".from_top(0)
+		mouse click "Create a test cycle".from_top(0)
+		wait "Create Test Cycle"
+		mouse click "Name".from_top(0).center_bottom().move_down(20)
+		type "To be automated"
+		mouse click "Test Cases"
+		mouse click "adding test cases"
+		mouse click "Some test".right_center().move_right(50)
+		mouse click "Add".from_bottom(0)
+		wait "1 test case has been added"
+		mouse click "Save".from_top(0)
+		exec bash "apt install -y nodejs npm"
+		exec bash "mkdir /opt/TestoTM4J"
+		copyto "${TM4J_PLUGIN_SRC_DIR}/package.json" "/opt/TestoTM4J/package.json"
+		exec bash """
+			cd /opt/TestoTM4J
+			npm i
+		"""
 	}
 }
 
-test jira_test_testo_plugin: jira_builder_create_a_test {
+test jira_tmp: jira_builder_prepare {
 	jira_plugin_builder {
-		exec bash "rm -rf /opt/testo_jira_plugin/TestoPlugin/src/*"
-		copyto "${PLUGIN_SRC_DIR}/src/main" "/opt/testo_jira_plugin/TestoPlugin/src/main"
-		exec bash """
-			cd /opt/testo_jira_plugin/TestoPlugin/
-			atlas-mvn package
-		"""
+
 		abort "stop here"
 	}
 }
+
