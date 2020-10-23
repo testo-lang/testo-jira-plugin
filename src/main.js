@@ -22,6 +22,26 @@ let credentials = {
 
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
 
+async function walk(dir, basenames_to_match) {
+	let files = await fs.promises.readdir(dir)
+	let result = []
+	for (let file of files) {
+		let file_path = path.join(dir, file)
+		let stat = await fs.promises.stat(file_path)
+		if (stat.isDirectory()) {
+			result = result.concat(await walk(file_path, basename_to_match))
+		} else {
+			for (basename of basenames_to_match) {
+				if (path.basename(file_path) == basename) {
+					result.push(file_path)
+				}
+			}
+		}
+	}
+
+	return result
+}
+
 async function main() {
 	try {
 		const cycles = await axios.get(jira_rest_endpoint + `testrun/search?query=projectKey = "${argv.project}"`, {auth: credentials});
@@ -39,6 +59,9 @@ async function main() {
 
 		console.log(tests_to_run)
 
+		let files_to_run = await walk(argv.testo_project_dir, tests_to_run)
+
+		console.log(files)
 
 	} catch (error) {
 		console.error("ERROR")
