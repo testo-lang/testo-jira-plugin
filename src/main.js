@@ -115,6 +115,9 @@ async function main() {
 
 		console.log(files_to_run)
 
+
+		let jira_test_run_report = []
+
 		for (file_to_run of files_to_run) {
 			let test_case_key = path.parse(file_to_run).name
 			let report_test_folder = path.join(report_folder, test_case_key)
@@ -148,28 +151,51 @@ async function main() {
 			let output = await testo_run(testo_args)
 			console.log(output)
 
-			let jira_test_run_report = []
-
 			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json'))
 
 			console.log(testo_report)
 
-			let current_index = 0
+			let scriptResults = []
+
+			let general_status = 'Pass'
+
+			for (let i = 0; i < testo_report.tests.length; i++) {
+				let test = testo_report.tests[i]
+				let status = test.status == 'success' ? 'Pass' : 'Fail'
+
+				if (status == 'Fail') {
+					general_status = 'Fail'
+				}
+
+				let message = ''
+
+				if (test.description.length) {
+					message += 'description: ' + test.description + '<br><br>'
+				}
+
+				if (test.is_cached) {
+					message += "THE TEST IS CACHED"
+				} else {
+					let data = fs.readFileSync(report_test_folder + `/${test.name}`, 'utf8')
+					message += data.replace(/\n/g, "<br>")
+				}
+
+				scriptResults.push({
+					index: i,
+					status: status,
+					comment: message
+				})
+			}
+
+			console.log(scriptResults)
 
 			jira_test_run_report.push({
-				status: 'Pass',
+				status: general_status,
 				testCaseKey: test_case_key,
 				executionTime: Math.abs(Date.parse(testo_report.stop_timestamp) - Date.parse(testo_report.start_timestamp)),
 				executionDate: testo_report.start_timestamp,
 				executedBy: argv.username,
-
-				scriptResults: [
-					{
-						index: 0,
-						status: 'Pass',
-						comment: output
-					}
-				]
+				scriptResults: scriptResults
 			})
 
 			let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, jira_test_run_report, {auth: credentials})
@@ -188,7 +214,7 @@ main()
 
 async function tmp() {
 const cycles = await axios.get(jira_rest_endpoint + `testrun/SAMPLE-C6/testresults`, {auth: credentials});
-console.log (cycles.data)
+console.log (cycles.data[0].scriptResults)
 
 }
 
