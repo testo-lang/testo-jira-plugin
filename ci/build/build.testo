@@ -293,13 +293,13 @@ test jira_builder_prepare: jira_builder_install_tm4j {
 		mouse click "Add".from_bottom(0)
 		wait "1 test case has been added"
 		mouse click "Save".from_top(0)
-		exec bash "apt install -y nodejs npm"
+		/*exec bash "apt install -y nodejs npm"
 		exec bash "mkdir /opt/TestoTM4J"
 		copyto "${TM4J_PLUGIN_SRC_DIR}/package.json" "/opt/TestoTM4J/package.json"
 		exec bash """
 			cd /opt/TestoTM4J
 			npm i
-		"""
+		"""*/
 	}
 }
 
