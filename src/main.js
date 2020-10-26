@@ -3,14 +3,14 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const child_process = require('child_process')
+const FormData = require('form-data');
 
 let argv = require('yargs/yargs')(process.argv.slice(2))
 	.usage('Usage: $0 [options]')
-	.demandOption(['jira_url', 'username', 'password', 'project', 'cycle', 'testo_project_dir'])
+	.demandOption(['jira_url', 'username', 'password', 'cycle', 'testo_project_dir'])
 	.describe('jira_url', 'target JIRA url (e.g. http://www.my_host.ru/jira')
 	.describe('username', 'JIRA login')
 	.describe('password', 'JIRA password')
-	.describe('project', 'JIRA project name')
 	.describe('cycle', 'TJ4M cycle to run by Testo')
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
 	.describe('param', 'param to pass into Testo script')
@@ -96,17 +96,13 @@ const deleteFolderRecursive = function(folder) {
 async function main() {
 	try {
 
-		const cycles = await axios.get(jira_rest_endpoint + `testrun/search?query=projectKey = "${argv.project}"`, {auth: credentials});
+		console.log (jira_rest_endpoint + `testrun/${argv.cycle}`)
 
+		const cycle = await axios.get(jira_rest_endpoint + `testrun/${argv.cycle}`, {auth: credentials});
 		let tests_to_run = []
 
-		for (let cycle of cycles.data) {
-			if (cycle.key == argv.cycle) {
-				for (let item of cycle.items) {
-					tests_to_run.push(item.testCaseKey)
-				}
-				break;
-			}
+		for (let item of cycle.data.items) {
+			tests_to_run.push(item.testCaseKey)
 		}
 
 		console.log(tests_to_run)
@@ -114,9 +110,6 @@ async function main() {
 		let files_to_run = await walk(argv.testo_project_dir, tests_to_run)
 
 		console.log(files_to_run)
-
-
-		let jira_test_run_report = []
 
 		for (file_to_run of files_to_run) {
 			let test_case_key = path.parse(file_to_run).name
@@ -165,41 +158,40 @@ async function main() {
 
 				if (status == 'Fail') {
 					general_status = 'Fail'
+					break;
 				}
-
-				let message = ''
-
-				if (test.description.length) {
-					message += 'description: ' + test.description + '<br><br>'
-				}
-
-				if (test.is_cached) {
-					message += "THE TEST IS CACHED"
-				} else {
-					let data = fs.readFileSync(report_test_folder + `/${test.name}`, 'utf8')
-					message += data.replace(/\n/g, "<br>")
-				}
-
-				scriptResults.push({
-					index: i,
-					status: status,
-					comment: message
-				})
 			}
 
-			console.log(scriptResults)
+			let message = output.replace(/\n/g, "<br>")
 
-			jira_test_run_report.push({
+			scriptResults.push({
+				index: 0,
 				status: general_status,
-				testCaseKey: test_case_key,
-				executionTime: Math.abs(Date.parse(testo_report.stop_timestamp) - Date.parse(testo_report.start_timestamp)),
-				executionDate: testo_report.start_timestamp,
-				executedBy: argv.username,
-				scriptResults: scriptResults
+				comment: message
 			})
 
+			let jira_test_run_report = [
+				{
+					status: general_status,
+					testCaseKey: test_case_key,
+					executionTime: Math.abs(Date.parse(testo_report.stop_timestamp) - Date.parse(testo_report.start_timestamp)),
+					executionDate: testo_report.start_timestamp,
+					executedBy: argv.username,
+					scriptResults: scriptResults
+				}
+			]
 			let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, jira_test_run_report, {auth: credentials})
 
+			let exec_id = post_reponse.data[0].id
+
+			fs.writeFileSync(report_test_folder + '/summary_output.txt', output)
+
+			const attachment = new FormData();
+			attachment.append('file', fs.createReadStream(report_test_folder + '/summary_output.txt'))
+
+			console.log(attachment)
+
+			post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
 			console.log(post_reponse)
 		}
 	} catch (error) {
@@ -210,13 +202,3 @@ async function main() {
 
 
 main()
-
-
-async function tmp() {
-const cycles = await axios.get(jira_rest_endpoint + `testrun/SAMPLE-C6/testresults`, {auth: credentials});
-console.log (cycles.data[0].scriptResults)
-
-}
-
-
-//tmp()
