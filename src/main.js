@@ -151,10 +151,6 @@ async function main() {
 				testo_args.push(param.value)
 			}
 
-			testo_args.push('--invalidate')
-			testo_args.push('some_test_2')
-
-
 			let testo_run_command = 'testo'
 
 			for (let arg of testo_args) {
@@ -238,7 +234,7 @@ async function main() {
 		console.log('All Done!')
 
 	} catch (error) {
-		console.error("ERROR: " + error)
+		console.error("\nERROR: " + error)
 	}
 }
 
