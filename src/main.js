@@ -39,7 +39,9 @@ for (let i = 0; i < argv.param.length; i++) {
 	})
 }
 
+if (argv.jira_url[argv.jira_url.length - 1] == "/") argv.jira_url = argv.jira_url.substr(0, argv.jira_url.length - 1)
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
+
 
 async function walk(dir, basenames_to_match, ext) {
 	let files = await fs.promises.readdir(dir)
@@ -48,7 +50,7 @@ async function walk(dir, basenames_to_match, ext) {
 		let file_path = path.join(dir, file)
 		let stat = await fs.promises.stat(file_path)
 		if (stat.isDirectory()) {
-			result = result.concat(await walk(file_path, basename_to_match, ext))
+			result = result.concat(await walk(file_path, basenames_to_match, ext))
 		} else {
 			for (basename of basenames_to_match) {
 				if (path.basename(file_path) == basename + ext) {
@@ -95,19 +97,32 @@ const deleteFolderRecursive = function(folder) {
 
 async function main() {
 	try {
-
-		console.log (jira_rest_endpoint + `testrun/${argv.cycle}`)
-
+		process.stdout.write(`Getting cycle ${argv.cycle} info from Jira... `);
 		const cycle = await axios.get(jira_rest_endpoint + `testrun/${argv.cycle}`, {auth: credentials});
-		let tests_to_run = []
+		process.stdout.write('Success\n\n');
 
+		let tests_to_run = []
+		console.log("We're about to run the following test cases:")
 		for (let item of cycle.data.items) {
 			tests_to_run.push(item.testCaseKey)
+			console.log(`\t- ${item.testCaseKey}`)
 		}
 
 		let files_to_run = await walk(argv.testo_project_dir, tests_to_run, '.testo')
 
-		console.log(files_to_run)
+		console.log('\nFound the following matching .testo files:')
+
+		for (let file of files_to_run) {
+			console.log(`\t-${file}`)
+		}
+
+		console.log('')
+
+		if (files_to_run.length != tests_to_run.length) {
+			throw "Found testo scripts count does not match the number of tests we need to run"
+		}
+
+		let tm4j_report = []
 
 		for (file_to_run of files_to_run) {
 			let test_case_key = path.parse(file_to_run).name
@@ -139,17 +154,19 @@ async function main() {
 			testo_args.push('--invalidate')
 			testo_args.push('some_test_2')
 
+
+			let testo_run_command = 'testo'
+
+			for (let arg of testo_args) {
+				testo_run_command += ' ' + arg
+			}
+
+			console.log('Running Testo: ' + testo_run_command)
 			let output = await testo_run(testo_args)
-			console.log(output)
-
+			console.log('Success\n')
 			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json'))
-
-			console.log(testo_report)
-
 			let scriptResults = []
-
 			let general_status = 'Pass'
-
 			let testo_tests = []
 
 			for (let i = 0; i < testo_report.tests.length; i++) {
@@ -171,7 +188,7 @@ async function main() {
 				comment: message
 			})
 
-			let jira_test_run_report = [
+			let tm4j_test_run_report = [
 				{
 					status: general_status,
 					testCaseKey: test_case_key,
@@ -181,32 +198,47 @@ async function main() {
 					scriptResults: scriptResults
 				}
 			]
-			let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, jira_test_run_report, {auth: credentials})
+
+			tm4j_report.push({
+				test_case_key: test_case_key,
+				report: tm4j_test_run_report,
+				output: output,
+				report_test_folder: report_test_folder,
+				testo_tests: testo_tests
+			})
+		}
+
+		console.log('Submitting results to Jira...')
+
+		for (let test of tm4j_report) {
+			let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, test.report, {auth: credentials})
 			let exec_id = post_reponse.data[0].id
+			console.log('Created Jira test result with id ' + exec_id)
 
 			let attachment = new FormData();
-			attachment.append('file', Buffer.from(output), {
+			attachment.append('file', Buffer.from(test.output), {
 				filename: 'summary_output.txt',
 				contentType: 'text/html; charset=utf-8',
-				knownLength: Buffer.from(output).length
+				knownLength: Buffer.from(test.output).length
 			 });
 
-
 			post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+			console.log('Attached summary output file to the test result ' + exec_id)
 
-			wait_error_files = await walk(report_test_folder, testo_tests, "_wait_failed.png")
+			wait_error_files = await walk(test.report_test_folder, test.testo_tests, "_wait_failed.png")
 
 			for (let file of wait_error_files) {
 				attachment = new FormData();
 				attachment.append('file', fs.createReadStream(file))
 				post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
-				console.log(post_reponse.data)
+				console.log(`Attached screenshot ${file} to the test result ${exec_id}`)
 			}
-
 		}
+
+		console.log('All Done!')
+
 	} catch (error) {
-		console.error("ERROR")
-		console.error(error)
+		console.error("ERROR: " + error)
 	}
 }
 
