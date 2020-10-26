@@ -41,17 +41,17 @@ for (let i = 0; i < argv.param.length; i++) {
 
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
 
-async function walk(dir, basenames_to_match) {
+async function walk(dir, basenames_to_match, ext) {
 	let files = await fs.promises.readdir(dir)
 	let result = []
 	for (let file of files) {
 		let file_path = path.join(dir, file)
 		let stat = await fs.promises.stat(file_path)
 		if (stat.isDirectory()) {
-			result = result.concat(await walk(file_path, basename_to_match))
+			result = result.concat(await walk(file_path, basename_to_match, ext))
 		} else {
 			for (basename of basenames_to_match) {
-				if (path.basename(file_path) == basename + '.testo') {
+				if (path.basename(file_path) == basename + ext) {
 					result.push(file_path)
 				}
 			}
@@ -69,7 +69,7 @@ function testo_run(args) {
 		p.stdout.on('data', data => stdout += data)
 		p.stderr.on('data', data => stderr += data)
 		p.on('exit', code => {
-			if (code) {
+			if (code > 1) {
 				reject(stderr)
 			} else {
 				resolve(stdout)
@@ -105,9 +105,7 @@ async function main() {
 			tests_to_run.push(item.testCaseKey)
 		}
 
-		console.log(tests_to_run)
-
-		let files_to_run = await walk(argv.testo_project_dir, tests_to_run)
+		let files_to_run = await walk(argv.testo_project_dir, tests_to_run, '.testo')
 
 		console.log(files_to_run)
 
@@ -152,8 +150,11 @@ async function main() {
 
 			let general_status = 'Pass'
 
+			let testo_tests = []
+
 			for (let i = 0; i < testo_report.tests.length; i++) {
 				let test = testo_report.tests[i]
+				testo_tests.push(test.name)
 				let status = test.status == 'success' ? 'Pass' : 'Fail'
 
 				if (status == 'Fail') {
@@ -181,18 +182,27 @@ async function main() {
 				}
 			]
 			let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, jira_test_run_report, {auth: credentials})
-
 			let exec_id = post_reponse.data[0].id
 
-			fs.writeFileSync(report_test_folder + '/summary_output.txt', output)
+			let attachment = new FormData();
+			attachment.append('file', Buffer.from(output), {
+				filename: 'summary_output.txt',
+				contentType: 'text/html; charset=utf-8',
+				knownLength: Buffer.from(output).length
+			 });
 
-			const attachment = new FormData();
-			attachment.append('file', fs.createReadStream(report_test_folder + '/summary_output.txt'))
-
-			console.log(attachment)
 
 			post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
-			console.log(post_reponse)
+
+			wait_error_files = await walk(report_test_folder, testo_tests, "_wait_failed.png")
+
+			for (let file of wait_error_files) {
+				attachment = new FormData();
+				attachment.append('file', fs.createReadStream(file))
+				post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+				console.log(post_reponse.data)
+			}
+
 		}
 	} catch (error) {
 		console.error("ERROR")
