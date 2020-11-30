@@ -1,3 +1,4 @@
+#!/usr/bin/node
 
 const axios = require('axios');
 const fs = require('fs');
@@ -119,7 +120,22 @@ async function main() {
 		console.log('')
 
 		if (files_to_run.length != tests_to_run.length) {
-			throw "Found testo scripts count does not match the number of tests we need to run"
+			let missing_tests = ""
+
+			for (let test of tests_to_run) {
+				found = false
+				for (let file of files_to_run) {
+					if (path.basename(file) == test + ".testo") {
+						found = true
+						break
+					}
+				}
+				if (!found) {
+					missing_tests += "\t- " + test + "\n"
+				}
+			}
+
+			throw "Missing .testo files for the following tests:\n" + missing_tests
 		}
 
 		let tm4j_report = []
@@ -237,6 +253,5 @@ async function main() {
 		console.error("\nERROR: " + error)
 	}
 }
-
 
 main()

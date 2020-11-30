@@ -1,16 +1,19 @@
 {
   "name": "testo-tm4j",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "A package for Testo-TM4J interaction",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Testo-lang",
   "license": "ISC",
   "dependencies": {
     "axios": "^0.20.0",
     "form-data": "^3.0.0",
     "yargs": "^16.1.0"
+  },
+  "bin": {
+  	"testo-tm4j" : "./main.js"
   }
 }
