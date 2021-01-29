@@ -17,6 +17,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('submit_result', 'Do not run testo. Just submit existing report for specified test case')
 	.describe('param', 'param to pass into Testo script')
 	.describe('license', 'license file to pass into Testo')
+	.describe('prefix', 'prefix to pass into Testo')
 	.nargs('param', 2)
 	.argv;
 
@@ -120,11 +121,18 @@ async function AttachStuff(exec_id, attachment) {
 // 		},
 // 		{
 // 			testCaseKey: "centos_backend_qemu_test_spec_exclude"
+// 		},
+// 		{
+// 			testCaseKey: "win10_ga"
+// 		},
+// 		{
+// 			testCaseKey: "win7_ga"
 // 		}
 // 	]
 // }
 //
 // async function SubmitTest(test) {
+// 	console.log(test)
 // 	return "EXEC_ID_" + test.test_case_key
 // }
 //
@@ -132,6 +140,10 @@ async function AttachStuff(exec_id, attachment) {
 // }
 
 // ==========================================================================
+
+function IsString(x) {
+	return typeof x === 'string' || x instanceof String
+}
 
 async function main() {
 	try {
@@ -194,6 +206,11 @@ async function main() {
 				testo_args.push(report_test_folder)
 				testo_args.push('--report_logs')
 				testo_args.push('--report_screenshots')
+
+				if (argv.prefix) {
+					testo_args.push('--prefix')
+					testo_args.push(argv.prefix)
+				}
 
 				if (argv.license) {
 					testo_args.push('--license')
@@ -272,11 +289,15 @@ async function main() {
 
 		console.log('Submitting results to Jira...')
 
+		let submitted_tests_count = 0
+
 		for (let test of tm4j_report) {
 			let should_submit = true;
 			if (argv.submit_result) {
-				if (argv["submit_result"] != test.test_case_key) {
-					should_submit = false;
+				if (IsString(argv.submit_result)) {
+					if (argv.submit_result != test.test_case_key) {
+						should_submit = false;
+					}
 				}
 			}
 
@@ -301,6 +322,18 @@ async function main() {
 					attachment.append('file', fs.createReadStream(file))
 					await AttachStuff(exec_id, attachment)
 					console.log(`Attached screenshot ${file} to the test result ${exec_id}`)
+				}
+
+				++submitted_tests_count
+			}
+		}
+
+		if (!submitted_tests_count) {
+			if (argv.submit_result) {
+				if (IsString(argv.submit_result)) {
+					throw `Couldn't find test results for test "${argv.submit_result}"`
+				} else {
+					throw `Couldn't find any test results`
 				}
 			}
 		}
