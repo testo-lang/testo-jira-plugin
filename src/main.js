@@ -33,11 +33,13 @@ if (!fs.existsSync(report_folder)){
 
 let params = []
 
-for (let i = 0; i < argv.param.length; i++) {
-	params.push ({
-		name: argv.param[i],
-		value: argv.param[++i]
-	})
+if (argv.param) {
+	for (let i = 0; i < argv.param.length; i++) {
+		params.push ({
+			name: argv.param[i],
+			value: argv.param[++i]
+		})
+	}
 }
 
 if (argv.jira_url[argv.jira_url.length - 1] == "/") argv.jira_url = argv.jira_url.substr(0, argv.jira_url.length - 1)
@@ -82,7 +84,7 @@ function testo_run(args) {
 	})
 }
 
-const deleteFolderRecursive = function(folder) {
+function deleteFolderRecursive(folder) {
 	if (fs.existsSync(folder)) {
 		fs.readdirSync(folder).forEach((file, index) => {
 			const curPath = path.join(folder, file);
@@ -96,15 +98,61 @@ const deleteFolderRecursive = function(folder) {
 	}
 };
 
+// ========================== JIRA real functions ========================
+
+async function GetCycleItems() {
+	const cycle = await axios.get(jira_rest_endpoint + `testrun/${argv.cycle}`, {auth: credentials});
+	return cycle.data.items
+}
+
+async function SubmitTest(test) {
+	let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, test.report, {auth: credentials})
+	return post_reponse.data[0].id
+}
+
+async function AttachStuff(exec_id, attachment) {
+	post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+}
+
+// ==========================================================================
+
+// ========================== JIRA mock functions ========================
+
+// async function GetCycleItems() {
+// 	return [
+// 		{
+// 			testCaseKey: "centos_backend_qemu_clean"
+// 		},
+// 		{
+// 			testCaseKey: "centos_backend_qemu_flash"
+// 		},
+// 		{
+// 			testCaseKey: "centos_backend_qemu_hostdev"
+// 		},
+// 		{
+// 			testCaseKey: "centos_backend_qemu_test_spec_exclude"
+// 		}
+// 	]
+// }
+//
+// async function SubmitTest(test) {
+// 	return "EXEC_ID_" + test.test_case_key
+// }
+//
+// async function AttachStuff(exec_id, attachment) {
+// }
+
+// ==========================================================================
+
 async function main() {
 	try {
 		process.stdout.write(`Getting cycle ${argv.cycle} info from Jira... `);
-		const cycle = await axios.get(jira_rest_endpoint + `testrun/${argv.cycle}`, {auth: credentials});
+		const cycle_items = await GetCycleItems()
 		process.stdout.write('Success\n\n');
 
 		let tests_to_run = []
 		console.log("We're about to run the following test cases:")
-		for (let item of cycle.data.items) {
+		for (let item of cycle_items) {
 			tests_to_run.push(item.testCaseKey)
 			console.log(`\t- ${item.testCaseKey}`)
 		}
@@ -182,7 +230,7 @@ async function main() {
 				output = fs.readFileSync(report_test_folder + '/summary.txt')
 				output += fs.readFileSync(report_test_folder + '/' + test_case_key)
 			}
-			
+
 			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json'))
 			let scriptResults = []
 			let general_status = 'Pass'
@@ -238,8 +286,7 @@ async function main() {
 			}
 
 			if (should_submit) {
-				let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, test.report, {auth: credentials})
-				let exec_id = post_reponse.data[0].id
+				let exec_id = await SubmitTest(test)
 				console.log('Created Jira test result with id ' + exec_id)
 
 				let attachment = new FormData();
@@ -249,7 +296,7 @@ async function main() {
 					knownLength: Buffer.from(test.output).length
 				 });
 
-				post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+				await AttachStuff(exec_id, attachment)
 				console.log('Attached summary output file to the test result ' + exec_id)
 
 				wait_error_files = await walk(test.report_test_folder, test.testo_tests, "_wait_failed.png")
@@ -257,7 +304,7 @@ async function main() {
 				for (let file of wait_error_files) {
 					attachment = new FormData();
 					attachment.append('file', fs.createReadStream(file))
-					post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+					await AttachStuff(exec_id, attachment)
 					console.log(`Attached screenshot ${file} to the test result ${exec_id}`)
 				}
 			}
