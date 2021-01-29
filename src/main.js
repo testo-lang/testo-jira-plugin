@@ -99,7 +99,7 @@ async function SuperAxios(args) {
 		try {
 			return await axios(args)
 		} catch (error) {
-			if (error.response.status != 404) {
+			if (!error.response || (error.response.status != 404)) {
 				throw error
 			}
 			process.stdout.write(`Failed to ${args.method} url ${args.url}. ${error}. `)
