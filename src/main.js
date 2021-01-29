@@ -88,20 +88,60 @@ function deleteFolderRecursive(folder) {
 	}
 };
 
+function Sleep(ms) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function SuperAxios(args) {
+	let interval = 10
+	let n_times = 60
+	for (let i = 0; i < n_times; ++i) {
+		try {
+			return await axios(args)
+		} catch (error) {
+			if (error.response.status != 404) {
+				throw error
+			}
+			process.stdout.write(`Failed to ${args.method} url ${args.url}. ${error}. `)
+			if (i != (n_times - 1)) {
+				process.stdout.write(`I'll try again in ${interval} seconds.\n`)
+				await Sleep(interval * 1000)
+			}
+		}
+	}
+	process.stdout.write('Giving up.\n')
+	throw "Exceeded the number of attempts to execute an http request"
+}
+
 // ========================== JIRA real functions ========================
 
 async function GetCycleItems() {
-	const cycle = await axios.get(jira_rest_endpoint + `testrun/${argv.cycle}`, {auth: credentials});
-	return cycle.data.items
+	const response = await SuperAxios({
+		method: 'get',
+		url: jira_rest_endpoint + `testrun/${argv.cycle}`,
+		auth: credentials
+	});
+	return response.data.items
 }
 
 async function SubmitTest(test) {
-	let post_reponse = await axios.post(jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`, test.report, {auth: credentials})
-	return post_reponse.data[0].id
+	let response = await SuperAxios({
+		method: 'post',
+		url: jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`,
+		data: test.report,
+		auth: credentials
+	})
+	return response.data[0].id
 }
 
 async function AttachStuff(exec_id, attachment) {
-	post_reponse = await axios.post(jira_rest_endpoint + `testresult/${exec_id}/attachments`, attachment, {auth: credentials,  headers: attachment.getHeaders()})
+	let response = await SuperAxios({
+		method: 'post',
+		url: jira_rest_endpoint + `testresult/${exec_id}/attachments`,
+		data: attachment,
+		auth: credentials,
+		headers: attachment.getHeaders()
+	})
 }
 
 // ==========================================================================
@@ -147,9 +187,9 @@ function IsString(x) {
 
 async function main() {
 	try {
-		process.stdout.write(`Getting cycle ${argv.cycle} info from Jira... `);
+		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
-		process.stdout.write('Success\n\n');
+		console.log('Success\n');
 
 		let tests_to_run = []
 		console.log("We're about to run the following test cases:")
