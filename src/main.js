@@ -31,17 +31,6 @@ if (!fs.existsSync(report_folder)){
 	fs.mkdirSync(report_folder);
 }
 
-let params = []
-
-if (argv.param) {
-	for (let i = 0; i < argv.param.length; i++) {
-		params.push ({
-			name: argv.param[i],
-			value: argv.param[++i]
-		})
-	}
-}
-
 if (argv.jira_url[argv.jira_url.length - 1] == "/") argv.jira_url = argv.jira_url.substr(0, argv.jira_url.length - 1)
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
 
@@ -187,9 +176,9 @@ async function main() {
 		}
 
 		let tm4j_report = []
-		let output = ""
 
-		for (file_to_run of files_to_run) {
+		for (let i = 0; i < files_to_run.length; i++) {
+			let file_to_run = files_to_run[i]
 			let test_case_key = path.parse(file_to_run).name
 			let report_test_folder = path.join(report_folder, test_case_key)
 
@@ -211,10 +200,12 @@ async function main() {
 					testo_args.push(argv.license)
 				}
 
-				for (param of params) {
-					testo_args.push('--param')
-					testo_args.push(param.name)
-					testo_args.push(param.value)
+				if (argv.param) {
+					for (let i = 0; i < argv.param.length; i++) {
+						testo_args.push('--param')
+						testo_args.push(argv.param[i])
+						testo_args.push(argv.param[++i])
+					}
 				}
 
 				let testo_run_command = 'testo'
@@ -223,15 +214,14 @@ async function main() {
 					testo_run_command += ' ' + arg
 				}
 
-				console.log('Running Testo: ' + testo_run_command)
-				output = await testo_run(testo_args)
+				console.log(`Running test ${i+1}/${files_to_run.length}: ` + testo_run_command)
+				await testo_run(testo_args)
 				console.log('Success\n')
-			} else {
-				output = fs.readFileSync(report_test_folder + '/summary.txt')
-				output += fs.readFileSync(report_test_folder + '/' + test_case_key)
 			}
 
-			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json'))
+			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json', 'utf8'))
+			let output = ""
+
 			let scriptResults = []
 			let general_status = 'Pass'
 			let testo_tests = []
@@ -241,12 +231,17 @@ async function main() {
 				testo_tests.push(test.name)
 				let status = test.status == 'success' ? 'Pass' : 'Fail'
 
+				if (!test.is_cached) {
+					output += fs.readFileSync(report_test_folder + '/' + test.name, 'utf8')
+				}
+
 				if (status == 'Fail') {
 					general_status = 'Fail'
 					break;
 				}
 			}
 
+			output += fs.readFileSync(report_test_folder + '/summary.txt', 'utf8')
 			let message = output.replace(/\n/g, "<br>")
 
 			scriptResults.push({
