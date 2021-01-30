@@ -192,7 +192,7 @@ async function main() {
 		console.log('Success\n');
 
 		let tests_to_run = []
-		console.log("We're about to run the following test cases:")
+		console.log("Found the following test cases:")
 		for (let item of cycle_items) {
 			tests_to_run.push(item.testCaseKey)
 			console.log(`\t- ${item.testCaseKey}`)
