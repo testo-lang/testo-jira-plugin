@@ -1,10 +1,9 @@
 #!/usr/bin/node
 
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const child_process = require('child_process')
 const FormData = require('form-data');
+const {Walk, RunProcess, SuperAxios, LoadReport} = require('./utils')
 
 let argv = require('yargs/yargs')(process.argv.slice(2))
 	.usage('Usage: $0 [options]')
@@ -14,10 +13,13 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('password', 'JIRA password')
 	.describe('cycle', 'TJ4M cycle to run by Testo')
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
-	.describe('submit_result', 'Do not run testo. Just submit existing report for specified test case')
 	.describe('param', 'param to pass into Testo script')
 	.describe('license', 'license file to pass into Testo')
 	.describe('prefix', 'prefix to pass into Testo')
+	.describe('report_folder', 'path where to save the report')
+	.default('report_folder', function tmpDir() {
+		return fs.mkdtempSync("/tmp/testo_tm4j_report_folder_")
+	})
 	.nargs('param', 2)
 	.argv;
 
@@ -26,94 +28,13 @@ let credentials = {
 	password: argv.password
 }
 
-let report_folder = '/tmp/testo_tm4j_report_folder'
-
-if (!fs.existsSync(report_folder)){
-	fs.mkdirSync(report_folder);
+if (argv.jira_url[argv.jira_url.length - 1] == "/") {
+	argv.jira_url = argv.jira_url.substr(0, argv.jira_url.length - 1)
 }
 
-if (argv.jira_url[argv.jira_url.length - 1] == "/") argv.jira_url = argv.jira_url.substr(0, argv.jira_url.length - 1)
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
 
-
-async function walk(dir, basenames_to_match, ext) {
-	let files = await fs.promises.readdir(dir)
-	let result = []
-	for (let file of files) {
-		let file_path = path.join(dir, file)
-		let stat = await fs.promises.stat(file_path)
-		if (stat.isDirectory()) {
-			result = result.concat(await walk(file_path, basenames_to_match, ext))
-		} else {
-			for (basename of basenames_to_match) {
-				if (path.basename(file_path) == basename + ext) {
-					result.push(file_path)
-				}
-			}
-		}
-	}
-
-	return result
-}
-
-function testo_run(args) {
-	return new Promise(function(resolve, reject) {
-		let p = child_process.spawn('testo', args)
-		let stdout = ''
-		let stderr = ''
-		p.stdout.on('data', data => stdout += data)
-		p.stderr.on('data', data => stderr += data)
-		p.on('exit', code => {
-			if (code > 1) {
-				reject(stderr)
-			} else {
-				resolve(stdout)
-			}
-		})
-		p.on('error', error => reject(error))
-	})
-}
-
-function deleteFolderRecursive(folder) {
-	if (fs.existsSync(folder)) {
-		fs.readdirSync(folder).forEach((file, index) => {
-			const curPath = path.join(folder, file);
-			if (fs.lstatSync(curPath).isDirectory()) { // recurse
-				deleteFolderRecursive(curPath);
-			} else { // delete file
-				fs.unlinkSync(curPath);
-			}
-		});
-		fs.rmdirSync(folder);
-	}
-};
-
-function Sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function SuperAxios(args) {
-	let interval = 10
-	let n_times = 60
-	for (let i = 0; i < n_times; ++i) {
-		try {
-			return await axios(args)
-		} catch (error) {
-			if (!error.response || (error.response.status != 404)) {
-				throw error
-			}
-			process.stdout.write(`Failed to ${args.method} url ${args.url}. ${error}. `)
-			if (i != (n_times - 1)) {
-				process.stdout.write(`I'll try again in ${interval} seconds.\n`)
-				await Sleep(interval * 1000)
-			}
-		}
-	}
-	process.stdout.write('Giving up.\n')
-	throw "Exceeded the number of attempts to execute an http request"
-}
-
-// ========================== JIRA real functions ========================
+// ========================== JIRA API ========================
 
 async function GetCycleItems() {
 	const response = await SuperAxios({
@@ -146,45 +67,6 @@ async function AttachStuff(exec_id, attachment) {
 
 // ==========================================================================
 
-// ========================== JIRA mock functions ========================
-
-// async function GetCycleItems() {
-// 	return [
-// 		{
-// 			testCaseKey: "centos_backend_qemu_clean"
-// 		},
-// 		{
-// 			testCaseKey: "centos_backend_qemu_flash"
-// 		},
-// 		{
-// 			testCaseKey: "centos_backend_qemu_hostdev"
-// 		},
-// 		{
-// 			testCaseKey: "centos_backend_qemu_test_spec_exclude"
-// 		},
-// 		{
-// 			testCaseKey: "win10_ga"
-// 		},
-// 		{
-// 			testCaseKey: "win7_ga"
-// 		}
-// 	]
-// }
-//
-// async function SubmitTest(test) {
-// 	console.log(test)
-// 	return "EXEC_ID_" + test.test_case_key
-// }
-//
-// async function AttachStuff(exec_id, attachment) {
-// }
-
-// ==========================================================================
-
-function IsString(x) {
-	return typeof x === 'string' || x instanceof String
-}
-
 async function main() {
 	try {
 		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
@@ -198,7 +80,14 @@ async function main() {
 			console.log(`\t- ${item.testCaseKey}`)
 		}
 
-		let files_to_run = await walk(argv.testo_project_dir, tests_to_run, '.testo')
+		let files_to_run = []
+		await Walk(argv.testo_project_dir, (file_name) => {
+			for (let item of cycle_items) {
+				if (path.basename(file_name) == `${item.testCaseKey}.testo`) {
+					files_to_run.push(file_name)
+				}
+			}
+		})
 
 		console.log('\nFound the following matching .testo files:')
 
@@ -227,15 +116,13 @@ async function main() {
 			throw "Missing .testo files for the following tests:\n" + missing_tests
 		}
 
-		let tm4j_report = []
+		let testo_report = await LoadReport(argv.report_folder)
 
 		for (let i = 0; i < files_to_run.length; i++) {
 			let file_to_run = files_to_run[i]
-			let test_case_key = path.parse(file_to_run).name
-			let report_test_folder = path.join(report_folder, test_case_key)
+			let launch = testo_report.findLaunchByFileName(file_to_run)
 
-			if (!argv.submit_result) {
-				deleteFolderRecursive(report_test_folder)
+			if (!launch) {
 
 				let testo_args = []
 
@@ -243,9 +130,7 @@ async function main() {
 				testo_args.push(file_to_run)
 				testo_args.push('--assume_yes')
 				testo_args.push('--report_folder')
-				testo_args.push(report_test_folder)
-				testo_args.push('--report_logs')
-				testo_args.push('--report_screenshots')
+				testo_args.push(argv.report_folder)
 
 				if (argv.prefix) {
 					testo_args.push('--prefix')
@@ -265,116 +150,72 @@ async function main() {
 					}
 				}
 
-				let testo_run_command = 'testo'
+				let testo_bin = 'testo'
 
-				for (let arg of testo_args) {
-					testo_run_command += ' ' + arg
-				}
-
-				console.log(`Running test ${i+1}/${files_to_run.length}: ` + testo_run_command)
-				await testo_run(testo_args)
+				console.log(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				await RunProcess(testo_bin, testo_args)
 				console.log('Success\n')
+
+				testo_report = await LoadReport(argv.report_folder)
+				launch = testo_report.findLaunchByFileName(file_to_run)
 			}
 
-			let testo_report = JSON.parse(fs.readFileSync(report_test_folder + '/report.json', 'utf8'))
 			let output = ""
 
-			let scriptResults = []
 			let general_status = 'Pass'
-			let testo_tests = []
+			let screenshots = []
 
-			for (let i = 0; i < testo_report.tests.length; i++) {
-				let test = testo_report.tests[i]
-				testo_tests.push(test.name)
-				let status = test.status == 'success' ? 'Pass' : 'Fail'
+			for (let test_run of launch.tests_runs) {
+				output += fs.readFileSync(path.join(test_run.report_folder, "log.txt"), 'utf8')
 
-				if (!test.is_cached) {
-					output += fs.readFileSync(report_test_folder + '/' + test.name, 'utf8')
-				}
+				await Walk(test_run.report_folder, (file_name) => {
+					if (path.parse(file_name).ext == ".png") {
+						screenshots.push(file_name)
+					}
+				})
 
-				if (status == 'Fail') {
+				if (test_run.exec_status == 'failed') {
 					general_status = 'Fail'
 					break;
 				}
 			}
 
-			output += fs.readFileSync(report_test_folder + '/summary.txt', 'utf8')
-			let message = output.replace(/\n/g, "<br>")
+			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
 
-			scriptResults.push({
-				index: 0,
-				status: general_status,
-				comment: message
-			})
+			console.log('Submitting results to Jira...')
 
-			let tm4j_test_run_report = [
+			let exec_id = await SubmitTest([
 				{
 					status: general_status,
-					testCaseKey: test_case_key,
-					executionTime: Math.abs(Date.parse(testo_report.stop_timestamp) - Date.parse(testo_report.start_timestamp)),
-					executionDate: testo_report.start_timestamp,
+					testCaseKey: path.parse(file_to_run).name,
+					executionTime: Math.abs(launch.stop_timestamp - launch.start_timestamp),
+					executionDate: launch.start_timestamp,
 					executedBy: argv.username,
-					scriptResults: scriptResults
+					scriptResults: [{
+						index: 0,
+						status: general_status,
+						comment: output.replace(/\n/g, "<br>")
+					}]
 				}
-			]
+			])
 
-			tm4j_report.push({
-				test_case_key: test_case_key,
-				report: tm4j_test_run_report,
-				output: output,
-				report_test_folder: report_test_folder,
-				testo_tests: testo_tests
-			})
-		}
+			console.log('Created Jira test result with id ' + exec_id)
 
-		console.log('Submitting results to Jira...')
+			let attachment = new FormData();
+			attachment.append('file', Buffer.from(output), {
+				filename: 'summary_output.txt',
+				contentType: 'text/html; charset=utf-8',
+				knownLength: Buffer.from(output).length
+			 });
 
-		let submitted_tests_count = 0
+			await AttachStuff(exec_id, attachment)
+			console.log('Attached summary output file to the test result ' + exec_id)
 
-		for (let test of tm4j_report) {
-			let should_submit = true;
-			if (argv.submit_result) {
-				if (IsString(argv.submit_result)) {
-					if (argv.submit_result != test.test_case_key) {
-						should_submit = false;
-					}
-				}
-			}
-
-			if (should_submit) {
-				let exec_id = await SubmitTest(test)
-				console.log('Created Jira test result with id ' + exec_id)
-
-				let attachment = new FormData();
-				attachment.append('file', Buffer.from(test.output), {
-					filename: 'summary_output.txt',
-					contentType: 'text/html; charset=utf-8',
-					knownLength: Buffer.from(test.output).length
-				 });
-
+			for (let screenshot of screenshots) {
+				attachment = new FormData();
+				attachment.append('file', fs.createReadStream(screenshot))
 				await AttachStuff(exec_id, attachment)
-				console.log('Attached summary output file to the test result ' + exec_id)
-
-				wait_error_files = await walk(test.report_test_folder, test.testo_tests, "_wait_failed.png")
-
-				for (let file of wait_error_files) {
-					attachment = new FormData();
-					attachment.append('file', fs.createReadStream(file))
-					await AttachStuff(exec_id, attachment)
-					console.log(`Attached screenshot ${file} to the test result ${exec_id}`)
-				}
-
-				++submitted_tests_count
-			}
-		}
-
-		if (!submitted_tests_count) {
-			if (argv.submit_result) {
-				if (IsString(argv.submit_result)) {
-					throw `Couldn't find test results for test "${argv.submit_result}"`
-				} else {
-					throw `Couldn't find any test results`
-				}
+				console.log(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
 			}
 		}
 
