@@ -45,11 +45,11 @@ async function GetCycleItems() {
 	return response.data.items
 }
 
-async function SubmitTest(test) {
+async function SubmitTest(report) {
 	let response = await SuperAxios({
 		method: 'post',
 		url: jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`,
-		data: test.report,
+		data: report,
 		auth: credentials
 	})
 	return response.data[0].id
