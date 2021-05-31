@@ -61,12 +61,14 @@ module.exports.SuperAxios = async function(args) {
 }
 
 class Report {
-	tests = []
-	tests_runs = []
-	launches = []
-	tests_map = new Map()
-	tests_runs_map = new Map()
-	launches_map = new Map()
+	constructor() {
+		this.tests = []
+		this.tests_runs = []
+		this.launches = []
+		this.tests_map = new Map()
+		this.tests_runs_map = new Map()
+		this.launches_map = new Map()
+	}
 
 	async init(report_folder) {
 		report_folder = path.normalize(report_folder)
