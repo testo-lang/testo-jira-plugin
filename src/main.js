@@ -188,7 +188,7 @@ async function main() {
 				{
 					status: general_status,
 					testCaseKey: path.parse(file_to_run).name,
-					executionTime: Math.abs(launch.stop_timestamp - launch.start_timestamp),
+					executionTime: Math.abs(Date.parse(launch.stop_timestamp) - Date.parse(launch.start_timestamp)),
 					executionDate: launch.start_timestamp,
 					executedBy: argv.username,
 					scriptResults: [{

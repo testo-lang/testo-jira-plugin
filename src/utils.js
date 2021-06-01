@@ -117,21 +117,13 @@ class Report {
 	}
 
 	postprocessTests() {
-		// nothing to do
 	}
 
 	postprocessTestsRuns() {
-		for (let test_run of this.tests_runs) {
-			test_run.start_timestamp = Date.parse(test_run.start_timestamp)
-			test_run.stop_timestamp = Date.parse(test_run.stop_timestamp)
-		}
 	}
 
 	postprocessLaunches() {
 		for (let launch of this.launches) {
-			launch.start_timestamp = Date.parse(launch.start_timestamp)
-			launch.stop_timestamp = Date.parse(launch.stop_timestamp)
-
 			let tests_runs = []
 			for (let id of launch.tests_runs) {
 				tests_runs.push(this.tests_runs_map.get(id))
