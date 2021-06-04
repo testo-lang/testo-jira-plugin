@@ -55,6 +55,15 @@ async function SubmitTest(report) {
 	return response.data[0].id
 }
 
+async function GetTestRuns() {
+	let response = await SuperAxios({
+		method: 'get',
+		url: jira_rest_endpoint + `testrun/${argv.cycle}/testresults/`,
+		auth: credentials
+	})
+	return response.data
+}
+
 async function AttachStuff(exec_id, attachment) {
 	let response = await SuperAxios({
 		method: 'post',
@@ -116,11 +125,15 @@ async function main() {
 			throw "Missing .testo files for the following tests:\n" + missing_tests
 		}
 
+		existing_test_runs = await GetTestRuns();
+
 		let testo_report = await LoadReport(argv.report_folder)
 
 		for (let i = 0; i < files_to_run.length; i++) {
 			let file_to_run = files_to_run[i]
 			let launch = testo_report.findLaunchByFileName(file_to_run)
+
+			let already_submitted = false;
 
 			if (!launch) {
 
@@ -158,6 +171,19 @@ async function main() {
 
 				testo_report = await LoadReport(argv.report_folder)
 				launch = testo_report.findLaunchByFileName(file_to_run)
+			} else {
+				//check if it's already been submitted
+				for (let i = 0; i < existing_test_runs.length; i++) {
+					if (existing_test_runs[i].comment == launch.id) {
+						console.log(`Omitting test ${files_to_run.length} because it's already been submitted`)
+						already_submitted = true
+						break
+					}
+				}
+			}
+
+			if (already_submitted) {
+				continue
 			}
 
 			let output = ""
@@ -191,6 +217,7 @@ async function main() {
 					executionTime: Math.abs(Date.parse(launch.stop_timestamp) - Date.parse(launch.start_timestamp)),
 					executionDate: launch.start_timestamp,
 					executedBy: argv.username,
+					comment: launch.id,
 					scriptResults: [{
 						index: 0,
 						status: general_status,
