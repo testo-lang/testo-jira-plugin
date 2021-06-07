@@ -4,6 +4,8 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
+async function Walk(dir, cb)
+
 module.exports.Walk = async function(dir, cb) {
 	let files = await fs.promises.readdir(dir)
 	for (let file of files) {
