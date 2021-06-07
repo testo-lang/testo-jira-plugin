@@ -4,9 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-async function Walk(dir, cb)
-
-module.exports.Walk = async function(dir, cb) {
+async function Walk(dir, cb) {
 	let files = await fs.promises.readdir(dir)
 	for (let file of files) {
 		let file_path = path.join(dir, file)
@@ -18,6 +16,9 @@ module.exports.Walk = async function(dir, cb) {
 		}
 	}
 }
+
+
+module.exports.Walk = Walk
 
 module.exports.RunProcess = function(cmd, args) {
 	return new Promise(function(resolve, reject) {
