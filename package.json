@@ -2,7 +2,7 @@
   "name": "testo-tm4j",
   "version": "2.1.2",
   "description": "A package for Testo-TM4J interaction",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -14,6 +14,6 @@
     "yargs": "^16.1.0"
   },
   "bin": {
-    "testo-tm4j": "./main.js"
+    "testo-tm4j": "./src/main.js"
   }
 }
