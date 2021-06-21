@@ -8,14 +8,15 @@ const {Walk, RunProcess, SuperAxios, LoadReport} = require('./utils')
 let argv = require('yargs/yargs')(process.argv.slice(2))
 	.usage('Usage: $0 [options]')
 	.demandOption(['jira_url', 'username', 'password', 'cycle', 'testo_project_dir'])
-	.describe('jira_url', 'target JIRA url (e.g. http://www.my_host.ru/jira')
+	.describe('jira_url', 'target JIRA url (e.g. http://www.my_host.ru/jira)')
 	.describe('username', 'JIRA login')
 	.describe('password', 'JIRA password')
 	.describe('cycle', 'TJ4M cycle to run by Testo')
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
-	.describe('param', 'param to pass into Testo script')
+	.describe('param', 'param to pass into Testo')
 	.describe('license', 'license file to pass into Testo')
 	.describe('prefix', 'prefix to pass into Testo')
+	.describe('invalidate', 'invalidate tests that correspond to a specified wildcard pattern')
 	.describe('report_folder', 'path where to save the report')
 	.default('report_folder', function tmpDir() {
 		return fs.mkdtempSync("/tmp/testo_tm4j_report_folder_")
@@ -126,6 +127,44 @@ async function main() {
 		}
 
 		existing_test_runs = await GetTestRuns();
+
+		if (argv.invalidate) {
+			let testo_args = []
+
+			testo_args.push('run')
+			testo_args.push(argv.testo_project_dir)
+			testo_args.push('--assume_yes')
+			testo_args.push('--report_folder')
+			testo_args.push(argv.report_folder)
+
+			if (argv.prefix) {
+				testo_args.push('--prefix')
+				testo_args.push(argv.prefix)
+			}
+
+			if (argv.license) {
+				testo_args.push('--license')
+				testo_args.push(argv.license)
+			}
+
+			if (argv.param) {
+				for (let i = 0; i < argv.param.length; i++) {
+					testo_args.push('--param')
+					testo_args.push(argv.param[i])
+					testo_args.push(argv.param[++i])
+				}
+			}
+
+			testo_args.push('--invalidate')
+			testo_args.push('"' + argv.invalidate + '"')
+			testo_args.push('--dry')
+
+			let testo_bin = 'testo'
+
+			console.log(`Invalidating tests "${argv.invalidate}": ${[testo_bin, ...testo_args].join(' ')}`)
+			await RunProcess(testo_bin, testo_args)
+			console.log('Success\n')
+		}
 
 		let testo_report = await LoadReport(argv.report_folder)
 
