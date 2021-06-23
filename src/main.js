@@ -167,12 +167,12 @@ async function main() {
 				}
 
 				testo_args.push('--invalidate')
-				testo_args.push('"' + argv.invalidate + '"')
+				testo_args.push(argv.invalidate)
 				testo_args.push('--dry')
 
 				let testo_bin = 'testo'
 
-				console.log(`Invalidating tests "${argv.invalidate}": ${[testo_bin, ...testo_args].join(' ')}`)
+				console.log(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
 				await RunProcess(testo_bin, testo_args)
 				console.log('Success\n')
 			}
