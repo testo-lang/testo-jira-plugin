@@ -21,7 +21,16 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.default('report_folder', function tmpDir() {
 		return fs.mkdtempSync("/tmp/testo_tm4j_report_folder_")
 	})
+	.nargs('jira_url', 1)
+	.nargs('username', 1)
+	.nargs('password', 1)
+	.nargs('cycle', 1)
+	.nargs('testo_project_dir', 1)
 	.nargs('param', 2)
+	.nargs('license', 1)
+	.nargs('prefix', 1)
+	.nargs('invalidate', 1)
+	.nargs('report_folder', 1)
 	.argv;
 
 let credentials = {
@@ -129,41 +138,44 @@ async function main() {
 		existing_test_runs = await GetTestRuns();
 
 		if (argv.invalidate) {
-			let testo_args = []
+			for (let i = 0; i < files_to_run.length; i++) {
+				let file_to_run = files_to_run[i]
+				let testo_args = []
 
-			testo_args.push('run')
-			testo_args.push(argv.testo_project_dir)
-			testo_args.push('--assume_yes')
-			testo_args.push('--report_folder')
-			testo_args.push(argv.report_folder)
+				testo_args.push('run')
+				testo_args.push(file_to_run)
+				testo_args.push('--assume_yes')
+				testo_args.push('--report_folder')
+				testo_args.push(argv.report_folder)
 
-			if (argv.prefix) {
-				testo_args.push('--prefix')
-				testo_args.push(argv.prefix)
-			}
-
-			if (argv.license) {
-				testo_args.push('--license')
-				testo_args.push(argv.license)
-			}
-
-			if (argv.param) {
-				for (let i = 0; i < argv.param.length; i++) {
-					testo_args.push('--param')
-					testo_args.push(argv.param[i])
-					testo_args.push(argv.param[++i])
+				if (argv.prefix) {
+					testo_args.push('--prefix')
+					testo_args.push(argv.prefix)
 				}
+
+				if (argv.license) {
+					testo_args.push('--license')
+					testo_args.push(argv.license)
+				}
+
+				if (argv.param) {
+					for (let i = 0; i < argv.param.length; i++) {
+						testo_args.push('--param')
+						testo_args.push(argv.param[i])
+						testo_args.push(argv.param[++i])
+					}
+				}
+
+				testo_args.push('--invalidate')
+				testo_args.push('"' + argv.invalidate + '"')
+				testo_args.push('--dry')
+
+				let testo_bin = 'testo'
+
+				console.log(`Invalidating tests "${argv.invalidate}": ${[testo_bin, ...testo_args].join(' ')}`)
+				await RunProcess(testo_bin, testo_args)
+				console.log('Success\n')
 			}
-
-			testo_args.push('--invalidate')
-			testo_args.push('"' + argv.invalidate + '"')
-			testo_args.push('--dry')
-
-			let testo_bin = 'testo'
-
-			console.log(`Invalidating tests "${argv.invalidate}": ${[testo_bin, ...testo_args].join(' ')}`)
-			await RunProcess(testo_bin, testo_args)
-			console.log('Success\n')
 		}
 
 		let testo_report = await LoadReport(argv.report_folder)
