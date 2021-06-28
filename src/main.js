@@ -2,8 +2,9 @@
 
 const fs = require('fs');
 const winston = require('winston')
-const path = require('path');
-const FormData = require('form-data');
+const path = require('path')
+const FormData = require('form-data')
+const crypto = require("crypto")
 const {Walk, RunProcess, SuperAxios, LoadReport} = require('./utils')
 
 let argv = require('yargs/yargs')(process.argv.slice(2))
@@ -20,7 +21,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('invalidate', 'invalidate tests that correspond to a specified wildcard pattern')
 	.describe('report_folder', 'path where to save the report')
 	.default('report_folder', function tmpDir() {
-		return fs.mkdtempSync("/tmp/testo_tm4j_report_folder_")
+		return "/tmp/testo_tm4j_report_folder_" + crypto.randomBytes(5).toString('hex')
 	})
 	.nargs('jira_url', 1)
 	.nargs('username', 1)
