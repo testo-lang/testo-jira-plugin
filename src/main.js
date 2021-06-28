@@ -132,9 +132,18 @@ async function AttachStuff(exec_id, attachment) {
 async function main() {
 	logger.debug("============================================== BEGIN ==============================================")
 
+	logger.debug("Original args: %j", process.argv)
+	logger.debug("Parsed args: %j", argv)
+
+	let package_json_path = path.join(__dirname, '..', 'package.json')
+	let package_json = JSON.parse(fs.readFileSync(package_json_path, 'utf8'))
+	logger.debug("Package json: %j", package_json)
+	logger.debug('')
+
 	try {
 		logger.info(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
+		logger.debug("Cycle items: %j", cycle_items)
 		logger.info('Success');
 
 		logger.info('')
@@ -184,7 +193,8 @@ async function main() {
 			throw new Error("Missing .testo files for the following tests:\n" + missing_tests)
 		}
 
-		existing_test_runs = await GetTestRuns();
+		let existing_test_runs = await GetTestRuns();
+		logger.debug("Existing test runs: %j", existing_test_runs)
 
 		if (argv.invalidate) {
 			for (let i = 0; i < files_to_run.length; i++) {
@@ -286,6 +296,8 @@ async function main() {
 				continue
 			}
 
+			logger.debug("Launch ID: %s", launch.id)
+
 			let output = ""
 
 			let general_status = 'Pass'
@@ -310,7 +322,7 @@ async function main() {
 
 			logger.info('Submitting results to Jira...')
 
-			let exec_id = await SubmitTest([
+			let submit_request = [
 				{
 					status: general_status,
 					testCaseKey: path.parse(file_to_run).name,
@@ -324,7 +336,11 @@ async function main() {
 						comment: output.replace(/\n/g, "<br>")
 					}]
 				}
-			])
+			]
+
+			logger.debug("Submit request: %j", submit_request)
+			let exec_id = await SubmitTest(submit_request)
+			logger.debug("Exec ID: %s", exec_id)
 
 			logger.info('Created Jira test result with id ' + exec_id)
 
@@ -347,6 +363,9 @@ async function main() {
 
 			logger.info('')
 		}
+
+		let final_test_runs = await GetTestRuns();
+		logger.debug("Final test runs: %j", final_test_runs)
 
 		logger.info('All Done!')
 
