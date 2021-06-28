@@ -60,7 +60,7 @@ module.exports.SuperAxios = async function(args) {
 		}
 	}
 	process.stdout.write('Giving up.\n')
-	throw "Exceeded the number of attempts to execute an http request"
+	throw new Error("Exceeded the number of attempts to execute an http request")
 }
 
 class Report {
@@ -82,7 +82,7 @@ class Report {
 		}
 
 		if (!files.includes(".testo_report_folder")) {
-			throw `Directory ${report_folder} is not a testo report folder`
+			throw new Error(`Directory ${report_folder} is not a testo report folder`)
 		}
 
 		if (files.includes("tests")) {

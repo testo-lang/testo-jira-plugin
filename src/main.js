@@ -1,6 +1,7 @@
 #!/usr/bin/node
 
 const fs = require('fs');
+const winston = require('winston')
 const path = require('path');
 const FormData = require('form-data');
 const {Walk, RunProcess, SuperAxios, LoadReport} = require('./utils')
@@ -43,6 +44,48 @@ if (argv.jira_url[argv.jira_url.length - 1] == "/") {
 }
 
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
+
+if (fs.existsSync(argv.report_folder)) {
+	let stat = fs.statSync(argv.report_folder)
+	if (!stat.isDirectory()) {
+		console.log(`Path "${argv.report_folder}" is not a directory`)
+		process.exit(1)
+	}
+	let files = fs.readdirSync(argv.report_folder)
+	if (!files.includes(".testo_report_folder") && files.length) {
+		console.log(`Directory "${argv.report_folder}" is not a testo report folder`)
+		process.exit(1)
+	}
+} else {
+	fs.mkdirSync(argv.report_folder, {recursive: true})
+}
+
+fs.closeSync(fs.openSync(path.join(argv.report_folder, '.testo_report_folder'), 'w'))
+
+logger = winston.createLogger({
+	transports: [
+		new winston.transports.Console({
+			format: winston.format.printf(info => info.message)
+		}),
+		new winston.transports.File({
+			filename: path.join(argv.report_folder, "testo-tm4j.log"),
+			level: 'debug',
+			format: winston.format.combine(
+				winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+				winston.format.errors({ stack: true }),
+				winston.format.splat(),
+				winston.format.printf(function ({timestamp, level, message, ...rest}) {
+					let stringifiedRest = JSON.stringify(rest)
+					if (stringifiedRest !== "{}") {
+						return `${timestamp} ${level} ${message} ${JSON.stringify(rest)}`
+					} else {
+						return `${timestamp} ${level} ${message}`
+					}
+				})
+			)
+		})
+	]
+});
 
 // ========================== JIRA API ========================
 
@@ -87,16 +130,20 @@ async function AttachStuff(exec_id, attachment) {
 // ==========================================================================
 
 async function main() {
+	logger.debug("============================================== BEGIN ==============================================")
+
 	try {
-		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
+		logger.info(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
-		console.log('Success\n');
+		logger.info('Success');
+
+		logger.info('')
 
 		let tests_to_run = []
-		console.log("Found the following test cases:")
+		logger.info("Found the following test cases:")
 		for (let item of cycle_items) {
 			tests_to_run.push(item.testCaseKey)
-			console.log(`\t- ${item.testCaseKey}`)
+			logger.info(`\t- ${item.testCaseKey}`)
 		}
 
 		let files_to_run = []
@@ -108,13 +155,15 @@ async function main() {
 			}
 		})
 
-		console.log('\nFound the following matching .testo files:')
+		logger.info('')
+
+		logger.info('Found the following matching .testo files:')
 
 		for (let file of files_to_run) {
-			console.log(`\t-${file}`)
+			logger.info(`\t-${file}`)
 		}
 
-		console.log('')
+		logger.info('')
 
 		if (files_to_run.length != tests_to_run.length) {
 			let missing_tests = ""
@@ -132,7 +181,7 @@ async function main() {
 				}
 			}
 
-			throw "Missing .testo files for the following tests:\n" + missing_tests
+			throw new Error("Missing .testo files for the following tests:\n" + missing_tests)
 		}
 
 		existing_test_runs = await GetTestRuns();
@@ -172,9 +221,9 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				console.log(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				logger.info(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
 				await RunProcess(testo_bin, testo_args)
-				console.log('Success\n')
+				logger.info('')
 			}
 		}
 
@@ -216,17 +265,16 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				console.log(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				logger.info(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
 				await RunProcess(testo_bin, testo_args)
-				console.log('Success\n')
 
 				testo_report = await LoadReport(argv.report_folder)
 				launch = testo_report.findLaunchByFileName(file_to_run)
 			} else {
 				//check if it's already been submitted
-				for (let i = 0; i < existing_test_runs.length; i++) {
-					if (existing_test_runs[i].comment == launch.id) {
-						console.log(`Omitting test ${files_to_run.length} because it's already been submitted`)
+				for (let j = 0; j < existing_test_runs.length; j++) {
+					if (existing_test_runs[j].comment == launch.id) {
+						logger.info(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
 						already_submitted = true
 						break
 					}
@@ -234,6 +282,7 @@ async function main() {
 			}
 
 			if (already_submitted) {
+				logger.info('')
 				continue
 			}
 
@@ -259,7 +308,7 @@ async function main() {
 
 			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
 
-			console.log('Submitting results to Jira...')
+			logger.info('Submitting results to Jira...')
 
 			let exec_id = await SubmitTest([
 				{
@@ -277,7 +326,7 @@ async function main() {
 				}
 			])
 
-			console.log('Created Jira test result with id ' + exec_id)
+			logger.info('Created Jira test result with id ' + exec_id)
 
 			let attachment = new FormData();
 			attachment.append('file', Buffer.from(output), {
@@ -287,21 +336,26 @@ async function main() {
 			 });
 
 			await AttachStuff(exec_id, attachment)
-			console.log('Attached summary output file to the test result ' + exec_id)
+			logger.info('Attached summary output file to the test result ' + exec_id)
 
 			for (let screenshot of screenshots) {
 				attachment = new FormData();
 				attachment.append('file', fs.createReadStream(screenshot))
 				await AttachStuff(exec_id, attachment)
-				console.log(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
+				logger.info(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
 			}
+
+			logger.info('')
 		}
 
-		console.log('All Done!')
+		logger.info('All Done!')
 
 	} catch (error) {
-		console.error("\nERROR: " + error)
+		logger.error("ERROR:", error)
 	}
+
+	logger.debug("============================================== END ==============================================")
+	logger.end()
 }
 
 main()
