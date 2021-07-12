@@ -1,6 +1,6 @@
 {
   "name": "testo-tm4j",
-  "version": "2.1.6",
+  "version": "2.1.7",
   "description": "A package for Testo-TM4J interaction",
   "main": "src/main.js",
   "scripts": {

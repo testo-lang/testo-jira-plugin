@@ -109,6 +109,17 @@ async function SubmitTest(report) {
 	return response.data[0].id
 }
 
+async function UpdateTest(report) {
+	let response = await SuperAxios({
+		method: 'put',
+		url: jira_rest_endpoint + `testrun/${argv.cycle}/testcase/${report.testCaseKey}/testresult`,
+		data: report,
+		auth: credentials
+	})
+	return response.data.id
+}
+
+
 async function GetTestRuns() {
 	let response = await SuperAxios({
 		method: 'get',
@@ -241,10 +252,32 @@ async function main() {
 		let testo_report = await LoadReport(argv.report_folder)
 
 		for (let i = 0; i < files_to_run.length; i++) {
+
+			let existing_test = null
 			let file_to_run = files_to_run[i]
 			let launch = testo_report.findLaunchByFileName(file_to_run)
 
+			//check if it's already been submitted
 			let already_submitted = false;
+			for (let j = 0; j < existing_test_runs.length; j++) {
+				if (existing_test_runs[j].testCaseKey == path.parse(file_to_run).name) {
+					if (launch && existing_test_runs[j].comment == launch.id) {
+						//Already submitted
+						logger.info(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
+						already_submitted = true
+						break
+					} else {
+						//That's the case we need to update
+						existing_test = existing_test_runs[j]
+						break
+					}
+				} 
+			}
+
+			if (already_submitted) {
+				logger.info('')
+				continue
+			}
 
 			if (!launch) {
 
@@ -281,21 +314,7 @@ async function main() {
 
 				testo_report = await LoadReport(argv.report_folder)
 				launch = testo_report.findLaunchByFileName(file_to_run)
-			} else {
-				//check if it's already been submitted
-				for (let j = 0; j < existing_test_runs.length; j++) {
-					if (existing_test_runs[j].comment == launch.id) {
-						logger.info(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
-						already_submitted = true
-						break
-					}
-				}
-			}
-
-			if (already_submitted) {
-				logger.info('')
-				continue
-			}
+			}			
 
 			logger.debug("Launch ID: %s", launch.id)
 
@@ -323,26 +342,56 @@ async function main() {
 
 			logger.info('Submitting results to Jira...')
 
-			let submit_request = [
-				{
-					status: general_status,
+			let exec_id = null;
+
+			if (existing_test) {
+				console.log('Updating')
+				let update_request = {
 					testCaseKey: path.parse(file_to_run).name,
+					status: general_status,
 					executionTime: Math.abs(Date.parse(launch.stop_timestamp) - Date.parse(launch.start_timestamp)),
 					executionDate: launch.start_timestamp,
-					executedBy: argv.username,
+					executedBy: existing_test.assignedTo,
 					comment: launch.id,
-					scriptResults: [{
-						index: 0,
-						status: general_status,
-						comment: output.replace(/\n/g, "<br>")
-					}]
+					scriptResults: []
 				}
-			]
+				console.log(existing_test)
 
-			logger.debug("Submit request: %j", submit_request)
-			let exec_id = await SubmitTest(submit_request)
+				for (let j = 0; j < existing_test.scriptResults.length; j++) {
+					update_request.scriptResults.push({
+						index: j,
+						status: general_status
+					})
+				}
+
+				update_request.scriptResults[update_request.scriptResults.length - 1].comment = output.replace(/\n/g, "<br>")
+
+				console.log("Update request: ", update_request)
+				logger.debug("Update request: %j", update_request)
+				exec_id = await UpdateTest(update_request)
+			} else {
+				let submit_request = [
+					{
+						status: general_status,
+						testCaseKey: path.parse(file_to_run).name,
+						executionTime: Math.abs(Date.parse(launch.stop_timestamp) - Date.parse(launch.start_timestamp)),
+						executionDate: launch.start_timestamp,
+						executedBy: argv.username,
+						comment: launch.id,
+						scriptResults: [{
+							index: 0,
+							status: general_status,
+							comment: output.replace(/\n/g, "<br>")
+						}]
+					}
+				]
+
+				logger.debug("Submit request: %j", submit_request)
+				exec_id = await SubmitTest(submit_request)
+			}
+
+			
 			logger.debug("Exec ID: %s", exec_id)
-
 			logger.info('Created Jira test result with id ' + exec_id)
 
 			let attachment = new FormData();
