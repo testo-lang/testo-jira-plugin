@@ -16,7 +16,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('cycle', 'TJ4M cycle to run by Testo')
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
 	.describe('param', 'param to pass into Testo')
-	.describe('license', 'license file to pass into Testo')
+	.describe('nn_server', 'NN Server endpoint to pass into Testo')
 	.describe('prefix', 'prefix to pass into Testo')
 	.describe('invalidate', 'invalidate tests that correspond to a specified wildcard pattern')
 	.describe('report_folder', 'path where to save the report')
@@ -29,7 +29,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.nargs('cycle', 1)
 	.nargs('testo_project_dir', 1)
 	.nargs('param', 2)
-	.nargs('license', 1)
+	.nargs('nn_server', 1)
 	.nargs('prefix', 1)
 	.nargs('invalidate', 1)
 	.nargs('report_folder', 1)
@@ -224,9 +224,9 @@ async function main() {
 					testo_args.push(argv.prefix)
 				}
 
-				if (argv.license) {
-					testo_args.push('--license')
-					testo_args.push(argv.license)
+				if (argv.nn_server) {
+					testo_args.push('--nn_server')
+					testo_args.push(argv.nn_server)
 				}
 
 				if (argv.param) {
@@ -294,9 +294,9 @@ async function main() {
 					testo_args.push(argv.prefix)
 				}
 
-				if (argv.license) {
-					testo_args.push('--license')
-					testo_args.push(argv.license)
+				if (argv.nn_server) {
+					testo_args.push('--nn_server')
+					testo_args.push(argv.nn_server)
 				}
 
 				if (argv.param) {
