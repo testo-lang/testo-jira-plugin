@@ -44,8 +44,7 @@ function Sleep(ms) {
 
 module.exports.SuperAxios = async function(args) {
 	let interval = 10
-	let n_times = 60
-	for (let i = 0; i < n_times; ++i) {
+	while (true) {
 		try {
 			return await axios(args)
 		} catch (error) {
@@ -53,14 +52,10 @@ module.exports.SuperAxios = async function(args) {
 				throw error
 			}
 			process.stdout.write(`Failed to ${args.method} url ${args.url}. ${error}. `)
-			if (i != (n_times - 1)) {
-				process.stdout.write(`I'll try again in ${interval} seconds.\n`)
-				await Sleep(interval * 1000)
-			}
+			process.stdout.write(`I'll try again in ${interval} seconds.\n`)
+			await Sleep(interval * 1000)
 		}
 	}
-	process.stdout.write('Giving up.\n')
-	throw new Error("Exceeded the number of attempts to execute an http request")
 }
 
 class Report {
