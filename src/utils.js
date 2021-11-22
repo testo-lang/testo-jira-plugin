@@ -48,9 +48,6 @@ module.exports.SuperAxios = async function(args) {
 		try {
 			return await axios(args)
 		} catch (error) {
-			if (!error.response || (error.response.status != 404)) {
-				throw error
-			}
 			process.stdout.write(`Failed to ${args.method} url ${args.url}. ${error}. `)
 			process.stdout.write(`I'll try again in ${interval} seconds.\n`)
 			await Sleep(interval * 1000)
