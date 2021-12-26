@@ -1,6 +1,6 @@
 {
   "name": "testo-tm4j",
-  "version": "2.1.10",
+  "version": "2.1.11",
   "description": "A package for Testo-TM4J interaction",
   "main": "src/main.js",
   "scripts": {
@@ -11,7 +11,6 @@
   "dependencies": {
     "axios": "^0.20.0",
     "form-data": "^3.0.0",
-    "winston": "^3.3.3",
     "yargs": "^16.1.0"
   },
   "bin": {

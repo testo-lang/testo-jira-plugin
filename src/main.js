@@ -1,7 +1,6 @@
 #!/usr/bin/node
 
 const fs = require('fs');
-const winston = require('winston')
 const path = require('path')
 const FormData = require('form-data')
 const crypto = require("crypto")
@@ -63,31 +62,6 @@ if (fs.existsSync(argv.report_folder)) {
 
 fs.closeSync(fs.openSync(path.join(argv.report_folder, '.testo_report_folder'), 'w'))
 
-logger = winston.createLogger({
-	transports: [
-		new winston.transports.Console({
-			format: winston.format.printf(info => info.message)
-		}),
-		new winston.transports.File({
-			filename: path.join(argv.report_folder, "testo-tm4j.log"),
-			level: 'debug',
-			format: winston.format.combine(
-				winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-				winston.format.errors({ stack: true }),
-				winston.format.splat(),
-				winston.format.printf(function ({timestamp, level, message, ...rest}) {
-					let stringifiedRest = JSON.stringify(rest)
-					if (stringifiedRest !== "{}") {
-						return `${timestamp} ${level} ${message} ${JSON.stringify(rest)}`
-					} else {
-						return `${timestamp} ${level} ${message}`
-					}
-				})
-			)
-		})
-	]
-});
-
 // ========================== JIRA API ========================
 
 async function GetCycleItems() {
@@ -142,29 +116,21 @@ async function AttachStuff(exec_id, attachment) {
 // ==========================================================================
 
 async function main() {
-	logger.debug("============================================== BEGIN ==============================================")
-
-	logger.debug("Original args: %j", process.argv)
-	logger.debug("Parsed args: %j", argv)
-
 	let package_json_path = path.join(__dirname, '..', 'package.json')
 	let package_json = JSON.parse(fs.readFileSync(package_json_path, 'utf8'))
-	logger.debug("Package json: %j", package_json)
-	logger.debug('')
 
 	try {
-		logger.info(`Getting cycle ${argv.cycle} info from Jira...`);
+		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
-		logger.debug("Cycle items: %j", cycle_items)
-		logger.info('Success');
+		console.log('Success');
 
-		logger.info('')
+		console.log('')
 
 		let tests_to_run = []
-		logger.info("Found the following test cases:")
+		console.log("Found the following test cases:")
 		for (let item of cycle_items) {
 			tests_to_run.push(item.testCaseKey)
-			logger.info(`\t- ${item.testCaseKey}`)
+			console.log(`\t- ${item.testCaseKey}`)
 		}
 
 		let files_to_run = []
@@ -176,15 +142,15 @@ async function main() {
 			}
 		})
 
-		logger.info('')
+		console.log('')
 
-		logger.info('Found the following matching .testo files:')
+		console.log('Found the following matching .testo files:')
 
 		for (let file of files_to_run) {
-			logger.info(`\t-${file}`)
+			console.log(`\t-${file}`)
 		}
 
-		logger.info('')
+		console.log('')
 
 		if (files_to_run.length != tests_to_run.length) {
 			let missing_tests = ""
@@ -206,7 +172,6 @@ async function main() {
 		}
 
 		let existing_test_runs = await GetTestRuns();
-		logger.debug("Existing test runs: %j", existing_test_runs)
 
 		if (argv.invalidate) {
 			for (let i = 0; i < files_to_run.length; i++) {
@@ -243,9 +208,9 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				logger.info(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				console.log(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
 				await RunProcess(testo_bin, testo_args)
-				logger.info('')
+				console.log('')
 			}
 		}
 
@@ -263,7 +228,7 @@ async function main() {
 				if (existing_test_runs[j].testCaseKey == path.parse(file_to_run).name) {
 					if (launch && existing_test_runs[j].comment == launch.id) {
 						//Already submitted
-						logger.info(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
+						console.log(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
 						already_submitted = true
 						break
 					} else {
@@ -275,7 +240,7 @@ async function main() {
 			}
 
 			if (already_submitted) {
-				logger.info('')
+				console.log('')
 				continue
 			}
 
@@ -309,14 +274,13 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				logger.info(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				console.log(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
 				await RunProcess(testo_bin, testo_args)
 
 				testo_report = await LoadReport(argv.report_folder)
 				launch = testo_report.findLaunchByFileName(file_to_run)
 			}			
 
-			logger.debug("Launch ID: %s", launch.id)
 
 			let output = ""
 
@@ -340,7 +304,7 @@ async function main() {
 
 			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
 
-			logger.info('Submitting results to Jira...')
+			console.log('Submitting results to Jira...')
 
 			let exec_id = null;
 
@@ -367,7 +331,6 @@ async function main() {
 				update_request.scriptResults[update_request.scriptResults.length - 1].comment = output.replace(/\n/g, "<br>")
 
 				console.log("Update request: ", update_request)
-				logger.debug("Update request: %j", update_request)
 				exec_id = await UpdateTest(update_request)
 			} else {
 				let submit_request = [
@@ -386,13 +349,11 @@ async function main() {
 					}
 				]
 
-				logger.debug("Submit request: %j", submit_request)
 				exec_id = await SubmitTest(submit_request)
 			}
 
 			
-			logger.debug("Exec ID: %s", exec_id)
-			logger.info('Created Jira test result with id ' + exec_id)
+			console.log('Created Jira test result with id ' + exec_id)
 
 			let attachment = new FormData();
 			attachment.append('file', Buffer.from(output), {
@@ -402,29 +363,25 @@ async function main() {
 			 });
 
 			await AttachStuff(exec_id, attachment)
-			logger.info('Attached summary output file to the test result ' + exec_id)
+			console.log('Attached summary output file to the test result ' + exec_id)
 
 			for (let screenshot of screenshots) {
 				attachment = new FormData();
 				attachment.append('file', fs.createReadStream(screenshot))
 				await AttachStuff(exec_id, attachment)
-				logger.info(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
+				console.log(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
 			}
 
-			logger.info('')
+			console.log('')
 		}
 
 		let final_test_runs = await GetTestRuns();
-		logger.debug("Final test runs: %j", final_test_runs)
 
-		logger.info('All Done!')
+		console.log('All Done!')
 
 	} catch (error) {
-		logger.error("ERROR:", error)
+		console.log("ERROR:", error)
 	}
-
-	logger.debug("============================================== END ==============================================")
-	logger.end()
 }
 
 main()
