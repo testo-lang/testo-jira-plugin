@@ -133,7 +133,6 @@ async function main() {
 	try {
 		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
-		console.log('Success');
 
 		console.log('')
 
@@ -219,10 +218,11 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				console.log(`Invalidating tests ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				console.log(`Invalidating test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')} ...`)
 				await RunProcess(testo_bin, testo_args)
-				console.log('')
 			}
+
+			console.log('')
 		}
 
 		let testo_report = await LoadReport(argv.report_folder)
@@ -239,7 +239,7 @@ async function main() {
 				if (existing_test_runs[j].testCaseKey == path.parse(file_to_run).name) {
 					if (launch && existing_test_runs[j].comment == launch.id) {
 						//Already submitted
-						console.log(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted`)
+						console.log(`Omitting test ${i+1}/${files_to_run.length} because it's already been submitted ...`)
 						already_submitted = true
 						break
 					} else {
@@ -285,7 +285,7 @@ async function main() {
 
 				let testo_bin = 'testo'
 
-				console.log(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')}`)
+				console.log(`Running test ${i+1}/${files_to_run.length}: ${[testo_bin, ...testo_args].join(' ')} ...`)
 				await RunProcess(testo_bin, testo_args)
 
 				testo_report = await LoadReport(argv.report_folder)
@@ -315,12 +315,10 @@ async function main() {
 
 			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
 
-			console.log('Submitting results to Jira...')
-
 			let exec_id = null;
 
 			if (existing_test) {
-				console.log('Updating')
+				console.log('Updating an existing test result ...')
 				let update_request = {
 					testCaseKey: path.parse(file_to_run).name,
 					status: general_status,
@@ -330,7 +328,6 @@ async function main() {
 					comment: launch.id,
 					scriptResults: []
 				}
-				console.log(existing_test)
 
 				for (let j = 0; j < existing_test.scriptResults.length; j++) {
 					update_request.scriptResults.push({
@@ -341,9 +338,9 @@ async function main() {
 
 				update_request.scriptResults[update_request.scriptResults.length - 1].comment = output.replace(/\n/g, "<br>")
 
-				console.log("Update request: ", update_request)
 				exec_id = await UpdateTest(update_request)
 			} else {
+				console.log('Submitting a new test result ...')
 				let submit_request = [
 					{
 						status: general_status,
@@ -363,9 +360,7 @@ async function main() {
 				exec_id = await SubmitTest(submit_request)
 			}
 
-			
-			console.log('Created Jira test result with id ' + exec_id)
-
+			console.log('Attaching a summary output file to the test result ...')
 			let attachment = new FormData();
 			attachment.append('file', Buffer.from(output), {
 				filename: 'summary_output.txt',
@@ -374,19 +369,16 @@ async function main() {
 			 });
 
 			await AttachStuff(exec_id, attachment)
-			console.log('Attached summary output file to the test result ' + exec_id)
 
 			for (let screenshot of screenshots) {
+				console.log(`Attaching a screenshot ${screenshot} to the test result ...`)
 				attachment = new FormData();
 				attachment.append('file', fs.createReadStream(screenshot))
 				await AttachStuff(exec_id, attachment)
-				console.log(`Attached screenshot ${screenshot} to the test result ${exec_id}`)
 			}
 
 			console.log('')
 		}
-
-		let final_test_runs = await GetTestRuns();
 
 		console.log('All Done!')
 
