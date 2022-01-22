@@ -45,6 +45,17 @@ if (argv.jira_url[argv.jira_url.length - 1] == "/") {
 
 let jira_rest_endpoint = argv.jira_url + "/rest/atm/1.0/"
 
+if (fs.existsSync(argv.testo_project_dir)) {
+	let stat = fs.statSync(argv.testo_project_dir)
+	if (!stat.isDirectory()) {
+		console.log(`Path "${argv.testo_project_dir}" is not a directory`)
+		process.exit(1)
+	}
+} else {
+	console.log(`Path "${argv.testo_project_dir}" does not exists`)
+	process.exit(1)
+}
+
 if (fs.existsSync(argv.report_folder)) {
 	let stat = fs.statSync(argv.report_folder)
 	if (!stat.isDirectory()) {
