@@ -313,6 +313,12 @@ async function main() {
 				}
 			}
 
+			if (launch.skipped_tests) {
+				if (launch.skipped_tests.length > 0) {
+					general_status = 'Blocked'
+				}
+			}
+
 			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
 
 			let exec_id = null;

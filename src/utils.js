@@ -130,6 +130,12 @@ class Report {
 				up_to_date_tests.push(this.tests_map.get(id))
 			}
 			launch.up_to_date_tests = up_to_date_tests
+
+			let skipped_tests = []
+			for (let id of launch.skipped_tests) {
+				skipped_tests.push(this.tests_map.get(id))
+			}
+			launch.skipped_tests = skipped_tests
 		}
 	}
 
