@@ -131,6 +131,18 @@ async function main() {
 	let package_json = JSON.parse(fs.readFileSync(package_json_path, 'utf8'))
 
 	try {
+		console.log('Checking testo version ...')
+		let version_output = await RunProcess('testo', ['version'])
+		let version_re = /(\d+).(\d+).(\d+)/
+		let match = version_output.match(version_re)
+		let major = match[1]
+		let minor = match[2]
+		let patch = match[3]
+		if (major < 3 || (major == 3 && minor < 2)) {
+			console.log('Testo client has incompatible version. You should update it to the version 3.2.0 or higher')
+			process.exit(1)
+		}
+
 		console.log(`Getting cycle ${argv.cycle} info from Jira...`);
 		const cycle_items = await GetCycleItems()
 
