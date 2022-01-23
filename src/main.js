@@ -320,12 +320,16 @@ async function main() {
 				})
 
 				if (test_run.exec_status == 'failed') {
-					general_status = 'Fail'
+					if (test_run.failure_category == 'logic_error') {
+						general_status = 'Irrelevant'
+					} else {
+						general_status = 'Fail'
+					}
 					break;
 				}
 			}
 
-			if (launch.skipped_tests) {
+			if (general_status == 'Fail') {
 				if (launch.skipped_tests.length > 0) {
 					general_status = 'Blocked'
 				}
