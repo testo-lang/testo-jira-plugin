@@ -139,7 +139,7 @@ async function main() {
 		let minor = match[2]
 		let patch = match[3]
 		if (major < 3 || (major == 3 && minor < 2)) {
-			console.log('Testo client has incompatible version. You should update it to the version 3.2.0 or higher')
+			console.log('Testo client has an incompatible version. You should update it to the version 3.2.0 or higher')
 			process.exit(1)
 		}
 
