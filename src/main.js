@@ -329,10 +329,8 @@ async function main() {
 				}
 			}
 
-			if (general_status == 'Fail') {
-				if (launch.skipped_tests.length > 0) {
-					general_status = 'Blocked'
-				}
+			if (launch.skipped_tests.length > 0) {
+				general_status = 'Blocked'
 			}
 
 			output += fs.readFileSync(path.join(launch.report_folder, "log.txt"), 'utf8')
