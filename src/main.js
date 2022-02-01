@@ -51,8 +51,8 @@ async function CheckTestoVersion() {
 	let major = match[1]
 	let minor = match[2]
 	let patch = match[3]
-	if (major < 3 || (major == 3 && minor < 3)) {
-		console.log('Testo client has an incompatible version. You should update it to the version 3.3.0 or higher')
+	if (major < 3 || (major == 3 && minor < 4)) {
+		console.log('Testo client has an incompatible version. You should update it to the version 3.4.0 or higher')
 		process.exit(1)
 	}
 }
@@ -256,6 +256,19 @@ class JTest {
 			return "Pass"
 		}
 	}
+	getIssueLinks() {
+		let result = []
+		for (let test of this.tests) {
+			if (test.last_test_run) {
+				for (let bug of test.last_test_run.found_bugs) {
+					if (!result.includes(bug)) {
+						result.push(bug)
+					}
+				}
+			}
+		}
+		return result
+	}
 	async touch() {
 		this.exec_id = await jira.UpdateLastTestResult(this.test_case_key, {
 			status: this.getStatus(),
@@ -268,7 +281,8 @@ class JTest {
 		this.comment += output.trim().replace(/\n/g, "<br>")
 		this.exec_id = await jira.UpdateLastTestResult(this.test_case_key, {
 			comment: this.comment,
-			status: this.getStatus()
+			status: this.getStatus(),
+			issueLinks: this.getIssueLinks(),
 		})
 	}
 	async attachOutput(name, output) {
@@ -365,7 +379,7 @@ async function HandleReportScreenshot(msg) {
 
 	if (jtest) {
 		console.log("Uploading screenshot ...")
-		await jtest.attachScreenshot(test.name + "_screenshot.png", msg.screenshot)
+		await jtest.attachScreenshot(test.name + " " + msg.tag + ".png", msg.screenshot)
 	}
 }
 
