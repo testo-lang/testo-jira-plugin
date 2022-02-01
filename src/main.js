@@ -226,6 +226,7 @@ class JTest {
 		this.source_file = source_file
 		this.test_case_key =  GetTestCaseKey(source_file)
 		this.tests = []
+		this.comment = ""
 	}
 	getStatistics() {
 		let stats = {
@@ -261,14 +262,12 @@ class JTest {
 		})
 	}
 	async update(output) {
-		let exec = await jira.GetTestResult(this.exec_id)
-		let comment = ""
-		if (exec.comment) {
-			comment += TrimBR(exec.comment) + "<br><br>---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------<br><br>";
+		if (this.comment.length != 0) {
+			this.comment += "<br><br>---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------<br><br>";
 		}
-		comment += output.trim().replace(/\n/g, "<br>")
+		this.comment += output.trim().replace(/\n/g, "<br>")
 		this.exec_id = await jira.UpdateLastTestResult(this.test_case_key, {
-			comment,
+			comment: this.comment,
 			status: this.getStatus()
 		})
 	}
