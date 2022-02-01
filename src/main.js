@@ -73,8 +73,14 @@ async function CheckTestoVersion() {
 	let major = match[1]
 	let minor = match[2]
 	let patch = match[3]
-	if (major < 3 || (major == 3 && minor < 4)) {
-		console.log('Testo client has an incompatible version. You should update it to the version 3.4.0 or higher')
+	let min_major = 3
+	let min_minor = 6
+	let min_patch = 2
+	if ((major < min_major) ||
+		(major == min_major && minor < min_minor) ||
+		(major == min_major && minor == min_minor && patch < min_patch))
+	{
+		console.log(`Testo client has an incompatible version. You should update it to the version ${min_major}.${min_minor}.${min_patch} or higher`)
 		process.exit(1)
 	}
 }
@@ -205,6 +211,26 @@ function TrimBR(str) {
 let tests = new Map()
 let jtests = new Map()
 
+let num_of_tests_runs = 0
+
+let current_test_run_index = 0
+
+function current_progress() {
+	if (num_of_tests_runs == 0) {
+		return "[100%]"
+	}
+	let progress = Math.round(current_test_run_index / num_of_tests_runs * 100)
+	let result = "["
+	if (progress < 100) {
+		result += " "
+	}
+	if (progress < 10) {
+		result += " "
+	}
+	result += `${progress}%]`
+	return result
+}
+
 class Test {
 	constructor(obj) {
 		Object.assign(this, obj)
@@ -323,6 +349,8 @@ async function InitGlobalTestMap(files_to_run) {
 }
 
 async function HandleLaunchBegin(msg) {
+	num_of_tests_runs = msg.current_launch.num_of_tests_runs
+
 	console.log("Getting the list of all testo tests ...")
 	for (let test of msg.tests) {
 		test = new Test(test)
@@ -359,11 +387,13 @@ async function HandleTestSkipEnd(msg) {
 
 	test.last_test_run = msg.current_test_run
 
+	current_test_run_index += 1
+
 	if (jtest) {
-		console.log(`Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed. Uploading results ...`)
+		console.log(`${current_progress()} Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed. Uploading results ...`)
 		await jtest.update(test.output)
 	} else {
-		console.log(`Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed.`)
+		console.log(`${current_progress()} Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed.`)
 	}
 }
 
@@ -374,7 +404,7 @@ async function HandleTestBegin(msg) {
 	test.last_test_run = msg.current_test_run
 	test.output = ""
 
-	console.log(`Running test ${test.name} from file ${path.basename(test.source_file)} ...`)
+	console.log(`${current_progress()} Running test ${test.name} from file ${path.basename(test.source_file)} ...`)
 
 	if (jtest) {
 		await jtest.touch()
@@ -400,7 +430,7 @@ async function HandleReportScreenshot(msg) {
 	const jtest = jtests.get(test.source_file)
 
 	if (jtest) {
-		console.log("Uploading screenshot ...")
+		console.log(`${current_progress()} Uploading screenshot ...`)
 		await jtest.attachScreenshot(test.name + " " + msg.tag + ".png", msg.screenshot)
 	}
 }
@@ -411,12 +441,14 @@ async function HandleTestEnd(msg) {
 
 	test.last_test_run = msg.current_test_run
 
+	current_test_run_index += 1
+
 	if (jtest) {
-		console.log(`The test has finished with status "${msg.current_test_run.exec_status}". Uploading results ...`)
+		console.log(`${current_progress()} The test has finished with status "${msg.current_test_run.exec_status}". Uploading results ...`)
 		await jtest.update(test.output)
 		await jtest.attachOutput(test.name + "_output.txt", test.output)
 	} else {
-		console.log(`The test has finished with status "${msg.current_test_run.exec_status}".`)
+		console.log(`${current_progress()} The test has finished with status "${msg.current_test_run.exec_status}".`)
 	}
 }
 
