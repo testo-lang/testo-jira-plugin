@@ -3,11 +3,10 @@ const {SuperAxios} = require('./utils')
 const FormData = require('form-data')
 
 class JIRA {
-	constructor({username, password, jira_url, cycle}) {
-		this.credentials = {
-			username,
-			password
-		}
+	constructor({username, password, token, jira_url, cycle}) {
+		this.username = username
+		this.password = password
+		this.token = token
 
 		if (jira_url[jira_url.length - 1] == "/") {
 			jira_url = jira_url.substr(0, jira_url.length - 1)
@@ -17,23 +16,40 @@ class JIRA {
 		this.cycle = cycle
 	}
 
+	async MakeRequest(generate_request) {
+		return await SuperAxios(() => {
+			let request = generate_request()
+			if (this.username && this.password) {
+				request.auth = {
+					username: this.username,
+					password: this.password,
+				}
+			}
+			if (this.token) {
+				if (!request.headers) {
+					request.headers = {}
+				}
+				request.headers['Authorization'] = `Bearer ${this.token}`
+			}
+			return request
+		})
+	}
+
 	async GetCycleItems() {
-		const response = await SuperAxios(() => {
+		const response = await this.MakeRequest(() => {
 			return {
 				method: 'get',
 				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}`,
-				auth: this.credentials
 			}
 		})
 		return response.data.items
 	}
 
 	async GetTestResults() {
-		let response = await SuperAxios(() => {
+		let response = await this.MakeRequest(() => {
 			return {
 				method: 'get',
 				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
-				auth: this.credentials
 			}
 		})
 		return response.data
@@ -50,38 +66,35 @@ class JIRA {
 	}
 
 	async CreateNewTestResult(report) {
-		let response = await SuperAxios(() => {
+		let response = await this.MakeRequest(() => {
 			return {
 				method: 'post',
 				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
 				data: report,
-				auth: this.credentials
 			}
 		})
 		return response.data[0].id
 	}
 
 	async UpdateLastTestResult(test_case_key, report) {
-		let response = await SuperAxios(() => {
+		let response = await this.MakeRequest(() => {
 			return {
 				method: 'put',
 				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testcase/${test_case_key}/testresult`,
 				data: report,
-				auth: this.credentials
 			}
 		})
 		return response.data.id
 	}
 
 	async Attach(exec_id, generate_attachment) {
-		let response = await SuperAxios(() => {
+		let response = await this.MakeRequest(() => {
 			let attachment = generate_attachment()
 			return {
 				method: 'post',
 				url: `${this.jira_rest_endpoint}/testresult/${exec_id}/attachments`,
 				data: attachment,
-				auth: this.credentials,
-				headers: attachment.getHeaders()
+				headers: attachment.getHeaders(),
 			}
 		})
 	}

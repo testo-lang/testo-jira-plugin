@@ -8,10 +8,11 @@ const JIRA = require("./jira")
 
 let argv = require('yargs/yargs')(process.argv.slice(2))
 	.usage('Usage: $0 [options]')
-	.demandOption(['jira_url', 'username', 'password', 'cycle', 'testo_project_dir'])
+	.demandOption(['jira_url', 'cycle', 'testo_project_dir'])
 	.describe('jira_url', 'target JIRA url (e.g. http://www.my_host.ru/jira)')
 	.describe('username', 'JIRA login')
 	.describe('password', 'JIRA password')
+	.describe('token', 'JIRA auth token')
 	.describe('cycle', 'TJ4M cycle to run by Testo')
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
 	.describe('param', 'param to pass into Testo')
@@ -21,6 +22,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.nargs('jira_url', 1)
 	.nargs('username', 1)
 	.nargs('password', 1)
+	.nargs('token', 1)
 	.nargs('cycle', 1)
 	.nargs('testo_project_dir', 1)
 	.nargs('param', 2)
@@ -37,6 +39,26 @@ if (fs.existsSync(argv.testo_project_dir)) {
 	}
 } else {
 	console.log(`Path "${argv.testo_project_dir}" does not exists`)
+	process.exit(1)
+}
+
+if (!(argv.username || argv.password) && !argv.token) {
+	console.log(`Please specify authorization params (username&password or token)`)
+	process.exit(1)
+}
+
+if ((argv.username || argv.password) && argv.token) {
+	console.log(`You can't use both username&password and token params at the same time. Choose one method of authorization.`)
+	process.exit(1)
+}
+
+if (argv.username && !argv.password) {
+	console.log(`Please specify password`)
+	process.exit(1)
+}
+
+if (!argv.username && argv.password) {
+	console.log(`Please specify username`)
 	process.exit(1)
 }
 
