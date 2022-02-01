@@ -50,9 +50,10 @@ function Sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-module.exports.SuperAxios = async function(args) {
+module.exports.SuperAxios = async function(generate_args) {
 	let interval = 10
 	while (true) {
+		let args = generate_args()
 		try {
 			return await axios(args)
 		} catch (error) {

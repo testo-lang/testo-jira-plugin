@@ -18,19 +18,23 @@ class JIRA {
 	}
 
 	async GetCycleItems() {
-		const response = await SuperAxios({
-			method: 'get',
-			url: `${this.jira_rest_endpoint}/testrun/${this.cycle}`,
-			auth: this.credentials
-		});
+		const response = await SuperAxios(() => {
+			return {
+				method: 'get',
+				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}`,
+				auth: this.credentials
+			}
+		})
 		return response.data.items
 	}
 
 	async GetTestResults() {
-		let response = await SuperAxios({
-			method: 'get',
-			url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
-			auth: this.credentials
+		let response = await SuperAxios(() => {
+			return {
+				method: 'get',
+				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
+				auth: this.credentials
+			}
 		})
 		return response.data
 	}
@@ -46,55 +50,64 @@ class JIRA {
 	}
 
 	async CreateNewTestResult(report) {
-		let response = await SuperAxios({
-			method: 'post',
-			url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
-			data: report,
-			auth: this.credentials
+		let response = await SuperAxios(() => {
+			return {
+				method: 'post',
+				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testresults/`,
+				data: report,
+				auth: this.credentials
+			}
 		})
 		return response.data[0].id
 	}
 
 	async UpdateLastTestResult(test_case_key, report) {
-		let response = await SuperAxios({
-			method: 'put',
-			url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testcase/${test_case_key}/testresult`,
-			data: report,
-			auth: this.credentials
+		let response = await SuperAxios(() => {
+			return {
+				method: 'put',
+				url: `${this.jira_rest_endpoint}/testrun/${this.cycle}/testcase/${test_case_key}/testresult`,
+				data: report,
+				auth: this.credentials
+			}
 		})
 		return response.data.id
 	}
 
-	async Attach(exec_id, attachment) {
-		let response = await SuperAxios({
-			method: 'post',
-			url: `${this.jira_rest_endpoint}/testresult/${exec_id}/attachments`,
-			data: attachment,
-			auth: this.credentials,
-			headers: attachment.getHeaders()
+	async Attach(exec_id, generate_attachment) {
+		let response = await SuperAxios(() => {
+			let attachment = generate_attachment()
+			return {
+				method: 'post',
+				url: `${this.jira_rest_endpoint}/testresult/${exec_id}/attachments`,
+				data: attachment,
+				auth: this.credentials,
+				headers: attachment.getHeaders()
+			}
 		})
 	}
 
 	async AttachTextFile(exec_id, filename, binary_text) {
-		let attachment = new FormData()
-		attachment.append('file', binary_text, {
-			filename,
-			contentType: 'text/html; charset=utf-8',
-			knownLength: binary_text.length
+		await this.Attach(exec_id, () => {
+			let attachment = new FormData()
+			attachment.append('file', binary_text, {
+				filename,
+				contentType: 'text/html; charset=utf-8',
+				knownLength: binary_text.length
+			})
+			return attachment
 		})
-
-		await this.Attach(exec_id, attachment)
 	}
 
 	async AttachImage(exec_id, filename, binary_img) {
-		let attachment = new FormData()
-		attachment.append('file', binary_img, {
-			filename,
-			contentType: 'image/png',
-			knownLength: binary_img.length
+		await this.Attach(exec_id, () => {
+			let attachment = new FormData()
+			attachment.append('file', binary_img, {
+				filename,
+				contentType: 'image/png',
+				knownLength: binary_img.length
+			})
+			return attachment
 		})
-
-		await this.Attach(exec_id, attachment)
 	}
 }
 
