@@ -1,8 +1,10 @@
 
 const child_process = require('child_process')
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios')
+const fs = require('fs')
+const net = require('net')
+const path = require('path')
+const cbor = require('cbor')
 
 async function Walk(dir, cb) {
 	let files = await fs.promises.readdir(dir)
@@ -25,8 +27,14 @@ module.exports.RunProcess = function(cmd, args) {
 		let p = child_process.spawn(cmd, args)
 		let stdout = ''
 		let stderr = ''
-		p.stdout.on('data', data => stdout += data)
-		p.stderr.on('data', data => stderr += data)
+		p.stdout.on('data', data => {
+			stdout += data
+			// console.log("TESTO OUT: ", data.toString('utf8'))
+		})
+		p.stderr.on('data', data => {
+			stderr += data
+			// console.log("TESTO ERR: ", data.toString('utf8'))
+		})
 		p.on('exit', code => {
 			if (code > 1) {
 				reject(stderr)
@@ -55,102 +63,125 @@ module.exports.SuperAxios = async function(args) {
 	}
 }
 
-class Report {
+class Task {
 	constructor() {
-		this.tests = []
-		this.tests_runs = []
-		this.launches = []
-		this.tests_map = new Map()
-		this.tests_runs_map = new Map()
-		this.launches_map = new Map()
-	}
-
-	async init(report_folder) {
-		report_folder = path.normalize(report_folder)
-
-		let files = await fs.promises.readdir(report_folder)
-		if (!files.length) {
-			return
-		}
-
-		if (!files.includes(".testo_report_folder")) {
-			throw new Error(`Directory ${report_folder} is not a testo report folder`)
-		}
-
-		if (files.includes("tests")) {
-			await this.loadItems(path.join(report_folder, "tests"), this.tests, this.tests_map)
-		}
-
-		if (files.includes("tests_runs")) {
-			await this.loadItems(path.join(report_folder, "tests_runs"), this.tests_runs, this.tests_runs_map)
-		}
-
-		if (files.includes("launches")) {
-			await this.loadItems(path.join(report_folder, "launches"), this.launches, this.launches_map)
-		}
-
-		this.postprocessTests()
-		this.postprocessTestsRuns()
-		this.postprocessLaunches()
-	}
-
-	async loadItems(items_dir, list, map) {
-		let items_ids = await fs.promises.readdir(items_dir)
-		for (let item_id of items_ids) {
-			let item_dir = path.join(items_dir, item_id)
-			let stat = await fs.promises.stat(item_dir)
-			if (!stat.isDirectory()) {
-				continue
-			}
-			let meta_path = path.join(item_dir, "meta.json")
-			let meta = JSON.parse(await fs.promises.readFile(meta_path, 'utf8'))
-			meta.report_folder = item_dir
-			meta["id"] = item_id
-			list.push(meta)
-			map.set(item_id, meta)
-		}
-	}
-
-	postprocessTests() {
-	}
-
-	postprocessTestsRuns() {
-	}
-
-	postprocessLaunches() {
-		for (let launch of this.launches) {
-			let tests_runs = []
-			for (let id of launch.tests_runs) {
-				tests_runs.push(this.tests_runs_map.get(id))
-			}
-			launch.tests_runs = tests_runs
-
-			let up_to_date_tests = []
-			for (let id of launch.up_to_date_tests) {
-				up_to_date_tests.push(this.tests_map.get(id))
-			}
-			launch.up_to_date_tests = up_to_date_tests
-
-			let skipped_tests = []
-			for (let id of launch.skipped_tests) {
-				skipped_tests.push(this.tests_map.get(id))
-			}
-			launch.skipped_tests = skipped_tests
-		}
-	}
-
-	findLaunchByFileName(file_name) {
-		for (let launch of this.launches) {
-			if (launch.config.target == file_name) {
-				return launch
-			}
-		}
-		return null
+		this.promise = new Promise((resolve, reject)=> {
+			this.reject = reject
+			this.resolve = resolve
+		})
 	}
 }
 
-module.exports.LoadReport = async function(report_folder) {
-	let report = new Report()
-	await report.init(report_folder)
-	return report
+class ReadTask extends Task {
+	constructor(size) {
+		super()
+		this.size = size
+	}
 }
+
+class ReportReader {
+	constructor(socket) {
+		this.socket = socket
+		this.closed = false
+		this.buffer = null
+		this.read_task = null
+		socket.on('data', data => {
+			if (this.buffer) {
+				this.buffer = Buffer.concat([this.buffer, data])
+			} else {
+				this.buffer = data
+			}
+			if (this.read_task && this.read_task.size <= this.buffer.length) {
+				this.read_task.resolve(this.doRead(this.read_task.size))
+				this.read_task = null
+			}
+		});
+		socket.on('close', () => {
+			this.closed = true
+		});
+	}
+
+	doRead(size) {
+		let result = this.buffer.slice(0, size)
+		this.buffer = this.buffer.slice(size)
+		return result
+	}
+
+	async read(size) {
+		if (this.closed) {
+			throw "Can't read from a socket because Testo interpreter has closed a tcp connection"
+		}
+		if (this.read_task) {
+			throw "already has a pending read task"
+		}
+		if (this.buffer && this.buffer.length >= size) {
+			return this.doRead(size)
+		} else {
+			this.read_task = new ReadTask(size)
+			return await this.read_task.promise
+		}
+	}
+
+	async write(data) {
+		if (this.closed) {
+			throw "Can't write to a socket because Testo interpreter has closed a tcp connection"
+		}
+		return new Promise((resolve, reject) => {
+			this.socket.write(data, (error) => {
+				if (error) {
+					reject(error)
+				} else {
+					resolve()
+				}
+			})
+		})
+	}
+
+	async readInt() {
+		let buf = await this.read(4)
+		return buf.readInt32LE()
+	}
+
+	async recv() {
+		let size = await this.readInt()
+		let buf = await this.read(size)
+		return cbor.decodeFirst(buf)
+	}
+
+	async send(json) {
+		let data = cbor.encode(json)
+		let data_len = Buffer.alloc(4)
+		data_len.writeInt32LE(data.length)
+		await this.write(data_len)
+		await this.write(data)
+	}
+};
+
+async function CreateTcpServer() {
+	console.log(`Creating tcp server to accept connection from testo ...`);
+
+	return new Promise(function(resolve, reject) {
+		let server = net.createServer()
+		let accept_tasks = []
+		server.accept = async function() {
+			let task = new Task()
+			accept_tasks.push(task)
+			return task.promise
+		}
+		server.on('connection', function(socket) {
+			let task = accept_tasks.shift()
+			if (task) {
+				task.resolve(new ReportReader(socket));
+			}
+		})
+		server.listen({backlog: 1, host: 'localhost', port: 0}, (error) => {
+			if (error) {
+				reject(error)
+			} else {
+				resolve(server)
+			}
+		})
+	})
+}
+
+module.exports.CreateTcpServer = CreateTcpServer
