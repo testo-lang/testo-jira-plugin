@@ -313,7 +313,9 @@ async function HandleTestSkipBegin(msg) {
 
 	// do not print anything
 
-	await jtest.touch()
+	if (jtest) {
+		await jtest.touch()
+	}
 }
 
 async function HandleTestSkipEnd(msg) {
@@ -322,9 +324,12 @@ async function HandleTestSkipEnd(msg) {
 
 	test.last_test_run = msg.current_test_run
 
-	console.log(`Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed. Uploading results ...`)
-
-	await jtest.update(test.output)
+	if (jtest) {
+		console.log(`Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed. Uploading results ...`)
+		await jtest.update(test.output)
+	} else {
+		console.log(`Skipping test ${test.name} from file ${path.basename(test.source_file)} because some of its parents had failed.`)
+	}
 }
 
 async function HandleTestBegin(msg) {
@@ -336,7 +341,9 @@ async function HandleTestBegin(msg) {
 
 	console.log(`Running test ${test.name} from file ${path.basename(test.source_file)} ...`)
 
-	await jtest.touch()
+	if (jtest) {
+		await jtest.touch()
+	}
 }
 
 async function HandleReport(msg) {
@@ -353,12 +360,14 @@ async function HandleReportScreenshot(msg) {
 	if (!msg.hasOwnProperty('current_test_run')) {
 		return
 	}
-	console.log("Uploading screenshot ...")
 
 	const test = tests.get(msg.current_test_run.test_name)
 	const jtest = jtests.get(test.source_file)
 
-	await jtest.attachScreenshot(test.name + "_screenshot.png", msg.screenshot)
+	if (jtest) {
+		console.log("Uploading screenshot ...")
+		await jtest.attachScreenshot(test.name + "_screenshot.png", msg.screenshot)
+	}
 }
 
 async function HandleTestEnd(msg) {
@@ -367,10 +376,13 @@ async function HandleTestEnd(msg) {
 
 	test.last_test_run = msg.current_test_run
 
-	console.log(`The test has finished with status "${msg.current_test_run.exec_status}". Uploading results ...`)
-
-	await jtest.update(test.output)
-	await jtest.attachOutput(test.name + "_output.txt", test.output)
+	if (jtest) {
+		console.log(`The test has finished with status "${msg.current_test_run.exec_status}". Uploading results ...`)
+		await jtest.update(test.output)
+		await jtest.attachOutput(test.name + "_output.txt", test.output)
+	} else {
+		console.log(`The test has finished with status "${msg.current_test_run.exec_status}".`)
+	}
 }
 
 async function HandleLaunchEnd(msg) {
