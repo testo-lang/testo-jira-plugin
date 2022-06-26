@@ -17,6 +17,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('testo_project_dir', 'path to the dir with Testo tests')
 	.describe('param', 'param to pass into Testo')
 	.describe('nn_server', 'NN Server endpoint to pass into Testo')
+	.describe('log_level', 'Log level (info, trace)')
 	.describe('prefix', 'prefix to pass into Testo')
 	.describe('invalidate', 'invalidate tests that correspond to a specified wildcard pattern')
 	.nargs('jira_url', 1)
@@ -27,6 +28,7 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.nargs('testo_project_dir', 1)
 	.nargs('param', 2)
 	.nargs('nn_server', 1)
+	.nargs('log_level', 1)
 	.nargs('prefix', 1)
 	.nargs('invalidate', 1)
 	.argv;
@@ -181,6 +183,11 @@ async function LaunchTesto(launch_script, tcp_port) {
 	if (argv.invalidate) {
 		testo_args.push('--invalidate')
 		testo_args.push(argv.invalidate)
+	}
+
+	if (argv.log_level) {
+		testo_args.push('--log_level')
+		testo_args.push(argv.log_level)
 	}
 
 	if (argv.param) {
