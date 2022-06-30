@@ -20,6 +20,8 @@ let argv = require('yargs/yargs')(process.argv.slice(2))
 	.describe('log_level', 'Log level (info, trace)')
 	.describe('prefix', 'prefix to pass into Testo')
 	.describe('invalidate', 'invalidate tests that correspond to a specified wildcard pattern')
+	.describe('ignore_repl', 'do not enter into interactive mode')
+	.describe('skip_tests_with_repl', 'do not run tests that contains REPL actions')
 	.nargs('jira_url', 1)
 	.nargs('username', 1)
 	.nargs('password', 1)
@@ -188,6 +190,14 @@ async function LaunchTesto(launch_script, tcp_port) {
 	if (argv.log_level) {
 		testo_args.push('--log_level')
 		testo_args.push(argv.log_level)
+	}
+
+	if (argv.ignore_repl) {
+		testo_args.push('--ignore_repl')
+	}
+
+	if (argv.skip_tests_with_repl) {
+		testo_args.push('--skip_tests_with_repl')
 	}
 
 	if (argv.param) {
