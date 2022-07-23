@@ -79,7 +79,7 @@ async function CheckTestoVersion() {
 	let patch = match[3]
 	let min_major = 3
 	let min_minor = 6
-	let min_patch = 2
+	let min_patch = 7
 	if ((major < min_major) ||
 		(major == min_major && minor < min_minor) ||
 		(major == min_major && minor == min_minor && patch < min_patch))
@@ -435,7 +435,7 @@ async function HandleReport(msg) {
 	// do not print anything
 
 	const test = tests.get(msg.current_test_run.test_name)
-	test.output += msg.text
+	test.output += Buffer.from(msg.text).toString()
 }
 
 async function HandleReportScreenshot(msg) {
